@@ -1,3 +1,8 @@
+= `layers.py`
+
+Simple script to show all the layers of which the image is built.
+
+== Usage
 ----
 $ python layers.py -h
 usage: layers.py [-h] [-c] [-d] [-m] layer
@@ -14,9 +19,9 @@ optional arguments:
   -m, --machine     Machine parseable output
 ----
 
-Sample output:
+== Examples
 
-Default output:
+=== Default output
 
 ----
 $ python layers.py jboss/torquebox   
@@ -34,7 +39,7 @@ $ python layers.py jboss/torquebox
            └─ b621dc5d4989677e62bf8ee0316f557156b5cba2b551e8bbb6368fb5920ae3aa
 ----
 
-Output with commands:
+=== Output with commands
 
 ----
 $ python layers.py jboss/torquebox -c
@@ -52,7 +57,7 @@ $ python layers.py jboss/torquebox -c
            └─ b621dc5d4989677e62bf8ee0316f557156b5cba2b551e8bbb6368fb5920ae3aa [/bin/sh -c #(nop) CMD [/bin/sh -c /opt/torquebox-$TORQUEBOX_VERSION/jboss/bin/standalone.sh -b 0.0.0.0]]
 ----
 
-Machine parseable output:
+=== Machine parseable output
 
 ----
 $ python layers.py jboss/torquebox -c -m

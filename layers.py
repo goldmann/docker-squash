@@ -45,16 +45,24 @@ def main(args):
         else:
           print "RUN %s" % l['ContainerConfig']['Cmd'][-1]
     else:
-      line = "%s" % " " * i
+      if args.machine:
+        line = l['Id']
+        if args.commands:
+          line += "|"
+          if command:
+            line += "%s" % command
+        print line
+      else:
+        line = "%s" % " " * i
 
-      if l != layers[0]:
-        line += u'└─ '
+        if l != layers[0]:
+          line += u'└─ '
 
-      line += "%s" % l['Id']
+        line += "%s" % l['Id']
 
-      if args.commands:
-        line += " [%s]" % command
-      
+        if args.commands and command:
+          line += " [%s]" % command
+
       print line
 
     i+=1
@@ -64,6 +72,7 @@ if __name__ == "__main__":
   parser.add_argument('layer', help='ID of the layer or image ID or image name')
   parser.add_argument('-c', '--commands', action='store_true', help='Show commands executed to create the layer (if any)')
   parser.add_argument('-d', '--dockerfile', action='store_true', help='Create Dockerfile out of the layers [EXPERIMENTAL!]')
+  parser.add_argument('-m', '--machine', action='store_true', help='Machine parseable output')
   args = parser.parse_args()
 
   main(args)

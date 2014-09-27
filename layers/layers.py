@@ -51,7 +51,6 @@ def main(args):
           line += "|"
           if command:
             line += "%s" % command
-        print line
       else:
         line = "%s" % " " * i
 
@@ -63,7 +62,7 @@ def main(args):
         if args.commands and command:
           line += " [%s]" % command
 
-        print line
+      print line
 
     i+=1
 

@@ -5,19 +5,27 @@ import subprocess
 import json
 import argparse
 
+def to_camel_case(s):
+  return "".join(x.title() for x in s.split("_"))
+
 def read_layer(layers, image_id):
   try:
     output = subprocess.check_output("docker inspect %s" % image_id, shell=True, stderr=subprocess.STDOUT)
   except subprocess.CalledProcessError as e:
     print "Error while getting information about image / layer '%s'. Please make sure you specified correct information." % image_id
     sys.exit(2)
-  
+
   metadata = json.loads(output)[0]
 
-  layers.append(metadata)
+  m = {}
 
-  if 'Parent' in metadata and metadata['Parent']:
-    read_layer(layers, metadata['Parent'])
+  for k in metadata:
+    m[to_camel_case(k)] = metadata[k]
+
+  layers.append(m)
+
+  if 'Parent' in m and m['Parent']:
+    read_layer(layers, m['Parent'])
 
 def main(args):
 

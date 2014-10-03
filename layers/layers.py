@@ -7,7 +7,7 @@ import argparse
 
 def to_camel_case(s):
   if not "_" in s:
-    return s.title()
+    return s[0].upper() + s[1:]
 
   return "".join(x.title() for x in s.split("_"))
 

@@ -6,6 +6,8 @@ import json
 import argparse
 
 def to_camel_case(s):
+  if not "_" in s:
+    return s
   return "".join(x.title() for x in s.split("_"))
 
 def read_layer(layers, image_id):

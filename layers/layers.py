@@ -30,6 +30,20 @@ def read_layer(layers, image_id):
   if 'Parent' in m and m['Parent']:
     read_layer(layers, m['Parent'])
 
+def read_tags(image_id):
+  try:
+    output = subprocess.check_output("docker images --no-trunc | grep %s | awk '{ print $1 \":\" $2 }'" % image_id, shell=True, stderr=subprocess.STDOUT)
+  except subprocess.CalledProcessError as e:
+    print "Error while getting information about tags for image / layer '%s'. Please make sure you specified correct information." % image_id
+    sys.exit(2)
+
+  tags = output.strip().splitlines()
+
+  if not tags:
+    return ""
+  else:
+    return tags
+
 def main(args):
 
   image_id = args.layer
@@ -73,6 +87,9 @@ def main(args):
         if args.commands and command:
           line += " [%s]" % command
 
+        if args.tags:
+          line += " %s" % read_tags(l['Id'])
+
       print line
 
     i+=1
@@ -83,6 +100,7 @@ if __name__ == "__main__":
   parser.add_argument('-c', '--commands', action='store_true', help='Show commands executed to create the layer (if any)')
   parser.add_argument('-d', '--dockerfile', action='store_true', help='Create Dockerfile out of the layers [EXPERIMENTAL!]')
   parser.add_argument('-m', '--machine', action='store_true', help='Machine parseable output')
+  parser.add_argument('-t', '--tags', action='store_true', help='Print layer tags if available')
   args = parser.parse_args()
 
   main(args)

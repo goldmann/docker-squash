@@ -12,12 +12,12 @@ Print information about layers.
 positional arguments:
   layer             ID of the layer or image ID or image name
 
-  optional arguments:
-    -h, --help        show this help message and exit
-      -c, --commands    Show commands executed to create the layer (if any)
-        -d, --dockerfile  Create Dockerfile out of the layers [EXPERIMENTAL!]
-          -m, --machine     Machine parseable output
-            -t, --tags        Print layer tags if available
+optional arguments:
+  -h, --help        show this help message and exit
+  -c, --commands    Show commands executed to create the layer (if any)
+  -d, --dockerfile  Create Dockerfile out of the layers [EXPERIMENTAL!]
+  -m, --machine     Machine parseable output
+  -t, --tags        Print layer tags if available
 ----
 
 == Examples

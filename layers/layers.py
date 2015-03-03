@@ -30,19 +30,27 @@ def read_layer(layers, image_id):
   if 'Parent' in m and m['Parent']:
     read_layer(layers, m['Parent'])
 
-def read_tags(image_id):
+def read_tags():
   try:
-    output = subprocess.check_output("docker images --no-trunc | grep %s | awk '{ print $1 \":\" $2 }'" % image_id, shell=True, stderr=subprocess.STDOUT)
+    output = subprocess.check_output("docker images --no-trunc", shell=True, stderr=subprocess.STDOUT)
   except subprocess.CalledProcessError as e:
     print "Error while getting information about tags for image / layer '%s'. Please make sure you specified correct information." % image_id
     sys.exit(2)
 
-  tags = output.strip().splitlines()
+  tags = {}
 
-  if not tags:
-    return ""
-  else:
-    return tags
+  for l in output.strip().splitlines()[1:]:
+    data = " ".join(l.split()).split()
+
+    if data[0] == "<none>":
+      continue
+
+    if not data[2] in tags:
+      tags[data[2]] = []
+
+    tags[data[2]].append(data[0] + ":" + data[1])
+
+  return tags
 
 def main(args):
 
@@ -50,6 +58,9 @@ def main(args):
   layers = []
   read_layer(layers, image_id)
   layers.reverse()
+
+  if args.tags:
+    tags = read_tags()
 
   i = 0
 
@@ -88,9 +99,11 @@ def main(args):
           line += " [%s]" % command
 
         if args.tags:
-          line += " %s" % read_tags(l['Id'])
+          if l['Id'] in tags:
+            # Poor man's sorting
+            line += " %s" % sorted(tags[l['Id']])
 
-      print line
+      print line.encode("UTF-8")
 
     i+=1
 

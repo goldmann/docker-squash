@@ -5,18 +5,19 @@ Simple script to show all the layers of which the image is built.
 == Usage
 ----
 $ python layers.py -h
-usage: layers.py [-h] [-c] [-d] [-m] layer
+usage: layers.py [-h] [-c] [-d] [-m] [-t] layer
 
 Print information about layers.
 
 positional arguments:
   layer             ID of the layer or image ID or image name
 
-optional arguments:
-  -h, --help        show this help message and exit
-  -c, --commands    Show commands executed to create the layer (if any)
-  -d, --dockerfile  Create Dockerfile out of the layers [EXPERIMENTAL!]
-  -m, --machine     Machine parseable output
+  optional arguments:
+    -h, --help        show this help message and exit
+      -c, --commands    Show commands executed to create the layer (if any)
+        -d, --dockerfile  Create Dockerfile out of the layers [EXPERIMENTAL!]
+          -m, --machine     Machine parseable output
+            -t, --tags        Print layer tags if available
 ----
 
 == Examples
@@ -73,4 +74,30 @@ f267f0b474a2037c3ba0d185f3a7ac20a9b1e1967955745fcd5ee9abb0c5da4c|/bin/sh -c cd /
 904472e47182e3b34c944cc0a4e9e21a096afd64c913e47f3be314fa023239d7|/bin/sh -c #(nop) EXPOSE map[8080/tcp:{}]
 4ca0e3ea46ff37e49831c6bb27e9488f48b8db0fc4f6d7eda70bd4a04408daf7|/bin/sh -c #(nop) USER torquebox
 b621dc5d4989677e62bf8ee0316f557156b5cba2b551e8bbb6368fb5920ae3aa|/bin/sh -c #(nop) CMD [/bin/sh -c /opt/torquebox-$TORQUEBOX_VERSION/jboss/bin/standalone.sh -b 0.0.0.0]
+----
+
+=== Show tags if available
+
+NOTE: Only tags available locally will be added to the output
+
+----
+$ python layers.py -t jboss/torquebox       
+511136ea3c5a64f264b78b5433614aec563103b4d4702f3ba7d4d2698e22c158
+ └─ 782cf93a8f16d3016dae352188cd5cfedb6a15c37d4dbd704399f02d1bb89dab
+  └─ 7d3f07f8de5fb3a20c6cb1e4447773a5741e3641c1aa093366eaa0fc690c6417 ['fedora:latest']
+   └─ 1ef0a50fe8b1394d3626a7624a58b58cff9560ddb503743099a56bbe95ab481a
+    └─ 20a1abe1d9bfb9b1e46d5411abd5a38b6104a323b7c4fb5c0f1f161b8f7278c2
+     └─ cd5bb934bb6755e910d19ac3ae4cfd09221aa2f98c3fbb51a7486991364dc1ae
+      └─ 379edb00ab0764276787ea777243990da697f2f93acb5d9166ff73ad01511a87
+       └─ 4d37cbbfc67dd508e682a5431a99d8c1feba1bd8352ffd3ea794463d9cfa81cc
+        └─ 2ea8562cac7c25a308b4565b66d4f7e11a1d2137a599ef2b32ed23c78f0a0378 ['jboss/base:latest']
+         └─ 7759146eab1a3aa5ba5ed12483d03e64a6bf1061a383d5713a5e21fc40554457
+          └─ b17a20d6f5f8e7ed0a1dba277acd3f854c531b0476b03d63a8f0df4caf78c763
+           └─ e02bdb6c4ed5436da02c958d302af5f06c1ebb1821791f60d45e190ebb55130f
+            └─ 72d585299bb5c5c1c326422cfffadc93d8bb4020f35bf072b2d91d287967807a
+             └─ 90832e1f0bb9e9f98ecd42f6df6b124c1e6768babaddc23d646cd75c7b2fddec ['jboss/base-jdk:7']
+              └─ 9dee60b5ed055ca5dcf111d4e2173e3656fb03485889b5195f928a1ca55e8b84
+               └─ a6d5ee3c68e16ee69f46cc2cdd3f08b02263daa9768f3e940e05758893854bcc
+                └─ f02a871da49de27430a04a020c537bd00c6a8b6607117bbb2bea636511122366
+                 └─ 6ab21f0626248731fe05661107aa6a9212113e0e9d7bc26a4e32932865f38968 ['jboss/torquebox:latest']
 ----

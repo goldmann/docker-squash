@@ -1,0 +1,38 @@
+= `squash.py`
+
+A PoC of a tool that squashes layers from a Docker image.
+
+A new image will be created with all layers that are "above" the specified layers squashed. This new image will be tagged with the name provided at the invocation.
+
+== Installation
+
+----
+$ pip install --user -r requirements.txt
+----
+
+== Usage
+
+----
+$ python squash.py -h
+usage: squash.py [-h] [-t TMP_DIR] image layer tag
+
+Squashes all layers in the image from the layer specified as "layer" argument.
+
+positional arguments:
+  image                 Image to be squashed
+  layer                 ID of the layer or image ID or image name
+  tag                   Specify the tag to be used for the new image
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t TMP_DIR, --tmp-dir TMP_DIR
+                        Temporary directory to be used
+----
+
+== Examples
+
+NOTE: Currently this tool *does not* produce any output.
+
+----
+$ python squash.py image:latest e6903a263bcc2c8034ad03691163ecaf3511d211e3855c4667a8390cc1518344 image:squashed
+----

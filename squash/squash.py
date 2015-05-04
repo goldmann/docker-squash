@@ -118,7 +118,7 @@ def _layers_to_squash(layers, from_layer):
 
   to_squash = []
 
-  for l in layers:
+  for l in reversed(layers):
     if l == from_layer:
       break
 
@@ -163,9 +163,9 @@ def _append_layers(to_squash, squashed_tar, old_image_dir):
 def _clean_squashed_tar(squashed_tar):
   for f in _marker_files(squashed_tar):
     # Remove the marker files itself
-    subprocess.check_output("tar -f %s --delete %s" % (target, f), shell=True)
+    subprocess.check_output("tar -f %s --delete %s" % (squashed_tar, f), shell=True)
     # Remove the files that were marked to be deleted
-    subprocess.check_output("tar -f %s --delete %s" % (target, f.replace('.wh.', '')), shell=True)
+    subprocess.check_output("tar -f %s --delete %s" % (squashed_tar, f.replace('.wh.', '')), shell=True)
 
 def main(args):
 
@@ -229,11 +229,11 @@ def main(args):
   # Location of the tar archive with the squashed layers
   squashed_tar = os.path.join(squashed_dir, "layer.tar")
 
-  # Move all the layers that should be untouched
-  _move_layers(old_layers, squash_id, old_image_dir, new_image_dir)
-
   # Append all the layers on each other
   _append_layers(to_squash, squashed_tar, old_image_dir)
+
+  # Move all the layers that should be untouched
+  _move_layers(old_layers, squash_id, old_image_dir, new_image_dir)
 
   # Handle marker files
   _clean_squashed_tar(squashed_tar)

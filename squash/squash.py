@@ -12,10 +12,15 @@ import random
 import hashlib
 import datetime
 import docker
+import logging
+import tarfile
 
 # TODO Maybe use Python's tarfile? Dunno if it's possible to append to a file
 
-d = docker.Client(base_url='unix://var/run/docker.sock')
+d = docker.Client(base_url='unix://var/run/docker.sock', timeout = 240)
+
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger("squasher")
 
 def _read_layers(layers, image_id):
   """ Reads the JSON metadata for specified layer / image id """
@@ -28,24 +33,33 @@ def _read_layers(layers, image_id):
 
   layers.reverse()
 
-def _save_image(image_id, f):
+def _save_image(image_id, tar_file):
   """ Saves the image as a tar archive under specified name """
 
+  log.debug("Saving image %s to %s file..." % (image_id, tar_file))
+
   image = d.get_image(image_id)
-  image_tar = open(f,'w')
-  image_tar.write(image.data)
-  image_tar.close()
+
+  with open(tar_file, 'w') as f:
+    f.write(image.data)
+
+  log.debug("Image saved!")
 
 def _unpack(tar, directory):
   """ Unpacks the exported tar archive to selected directory """
+
+  log.debug("Unpacking %s tar file to %s directory" % (tar, directory))
+
   try:
     subprocess.check_output("tar -xf %s -C %s" % (tar, directory), shell=True)
   except subprocess.CalledProcessError as e:
-    print e
-    print "Error while unpacking %s file to %s directory." % (tar, directory)
-    sys.exit(2)
+    log.error(e)
+    log.error("Error while unpacking %s file to %s directory." % (tar, directory))
+    sys.exit(1)
 
-def _move_layers(layers, squash_id, src, dest):
+  log.debug("Done!")
+
+def _move_unmodified_layers(layers, squash_id, src, dest):
   """
   This moves all the layers that should be copied as-is.
   In other words - all layers that are not meant to be squashed will be
@@ -54,23 +68,29 @@ def _move_layers(layers, squash_id, src, dest):
   for layer in reversed(layers):
     shutil.move(os.path.join(src, layer), dest)
     if layer == squash_id:
+      # Stop if we are at the first layer that was squashed
       return
 
-def _marker_files(tar):
-  markers = []
+def _files_to_skip(to_squash, old_image_dir):
+  to_skip = []
 
-  try:
-    files = subprocess.check_output("tar -tf %s" % tar, shell=True).strip().split('\n')
-  except subprocess.CalledProcessError as e:
-    print e
-    print "Error while reading marker files from %s archive." % tar
-    sys.exit(2)
+  log.debug("Searching for marker files...")
 
-  for f in files:
-    if '.wh.' in f:
-      markers.append(f)
+  for layer_id in to_squash:
+    layer_tar = os.path.join(old_image_dir, layer_id, "layer.tar")
 
-  return markers
+    log.debug("Searching for marker files in '%s' archive..." % layer_tar)
+
+    with tarfile.open(layer_tar, 'r') as tar:
+      for member in tar.getmembers():
+        if '.wh.' in member.name:
+          log.debug("Found '%s' marker file" % member.name)
+          to_skip.append(member.name)
+          to_skip.append(member.name.replace('.wh.', ''))
+
+  log.debug("Following files were found: %s" % " ".join(to_skip))
+
+  return to_skip
 
 def _generate_target_json(old_image_id, new_image_id, squash_id, squashed_dir):
   json_file = os.path.join(squashed_dir, "json")
@@ -106,6 +126,7 @@ def _generate_repositories_json(repositories_file, new_image_id, tag):
     json.dump(repos, f)
 
 def _load_image(directory):
+
   try:
     subprocess.check_output("cd %s && tar -cf - . | docker load" % directory, shell=True)
   except subprocess.CalledProcessError as e:
@@ -139,33 +160,42 @@ def _prepare_tmp_directory(provided_tmp_dir):
   else:
     return tempfile.mkdtemp(prefix="tmp-docker-squash-")
 
-def _append_layers(to_squash, squashed_tar, old_image_dir):
-  # Move the first layer that is marked to be squashed.
-  # This will be the base for all other layers - we'll
-  # append to this base tar file.
-  shutil.move(os.path.join(old_image_dir, to_squash[0], "layer.tar"), squashed_tar)
+def _squash_layers(layers_to_squash, squashed_tar_file, old_image_dir):
 
-  # Remove the first element, since we already moved the layer
-  del to_squash[0]
+  # Find all files that should be skipped
+  #
+  # TODO: we probably should do it for current layer and
+  # apply only on the previous layer
+  to_skip = _files_to_skip(layers_to_squash, old_image_dir)
 
-  # We have the first layer avialable, let's append
-  # all subsequent layers to that one
-  for layer_id in to_squash:
-    layer_tar = os.path.join(old_image_dir, layer_id, "layer.tar")
-    # TODO Use --delete to remove duplicate files to save space
-    try:
-      subprocess.check_output("tar -f %s -A %s" % (squashed_tar, layer_tar), shell=True)
-    except subprocess.CalledProcessError as e:
-      print "Error while combining %s archive with %s file." % (layer_tar, squashed_tar)
-      sys.exit(2)
+  log.debug("Starting squashing...")
 
-# TODO symlinks / hardlinks
-def _clean_squashed_tar(squashed_tar):
-  for f in _marker_files(squashed_tar):
-    # Remove the marker files itself
-    subprocess.check_output("tar -f %s --delete %s" % (squashed_tar, f), shell=True)
-    # Remove the files that were marked to be deleted
-    subprocess.check_output("tar -f %s --delete %s" % (squashed_tar, f.replace('.wh.', '')), shell=True)
+  with tarfile.open(squashed_tar_file, 'w') as squashed_tar:
+
+    for layer_id in layers_to_squash:
+      layer_tar_file = os.path.join(old_image_dir, layer_id, "layer.tar")
+
+      log.debug("Squashing layer %s..." % layer_id)
+
+      # Open the exiting layer to squash
+      with tarfile.open(layer_tar_file, 'r') as layer_tar:
+
+        # Copy all the files to the new tar
+        for member in layer_tar.getmembers():
+          if not member.name in to_skip:
+            # Special case: symlinks
+            if member.issym():
+              squashed_tar.addfile(member)
+            else:
+              squashed_tar.addfile(member, layer_tar.extractfile(member))
+          else:
+            log.debug("Skipping '%s' file because it's on the list to skip files" % member.name)
+
+    log.debug("Squashing done!")
+
+def _remove_files_from_tar(files, tar):
+  log.debug("Removing following files: %s from %s archive..." % (" ".join(files), tar))
+  subprocess.check_output("tar -f %s --delete %s" % (tar, " ".join(files)), shell=True)
 
 def main(args):
 
@@ -189,9 +219,9 @@ def main(args):
     sys.exit(1)
 
   # Find the layers to squash
-  to_squash = _layers_to_squash(old_layers, squash_id)
+  layers_to_squash = _layers_to_squash(old_layers, squash_id)
 
-  if len(to_squash) == 0:
+  if len(layers_to_squash) == 0:
     print "There are no layers to squash, aborting."
     sys.exit(1)
 
@@ -209,9 +239,11 @@ def main(args):
   os.makedirs(old_image_dir)
 
   # Unpack the image
+  log.info("Unpacking exported tar (%s)..." % old_image_tar)
   _unpack(old_image_tar, old_image_dir)
 
   # Remove the tar file early to save some space
+  log.info("Removing exported tar (%s)..." % old_image_tar)
   os.remove(old_image_tar)
 
   # Directory where the new layers will be unpacked in prepareation to
@@ -222,6 +254,8 @@ def main(args):
   # Generate a new image id for the squashed layer
   new_image_id = hashlib.sha256(str(random.getrandbits(128))).hexdigest()
 
+  log.info("New layer ID for squashed content will be: %s" % new_image_id)
+
   # Prepare a directory for squashed layer content
   squashed_dir = os.path.join(new_image_dir, new_image_id)
   os.makedirs(squashed_dir)
@@ -230,13 +264,10 @@ def main(args):
   squashed_tar = os.path.join(squashed_dir, "layer.tar")
 
   # Append all the layers on each other
-  _append_layers(to_squash, squashed_tar, old_image_dir)
+  _squash_layers(layers_to_squash, squashed_tar, old_image_dir)
 
   # Move all the layers that should be untouched
-  _move_layers(old_layers, squash_id, old_image_dir, new_image_dir)
-
-  # Handle marker files
-  _clean_squashed_tar(squashed_tar)
+  _move_unmodified_layers(old_layers, squash_id, old_image_dir, new_image_dir)
 
   # Generate the metadata JSON based on the original one
   _generate_target_json(old_image_id, new_image_id, squash_id, squashed_dir)

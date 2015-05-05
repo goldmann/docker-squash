@@ -191,10 +191,6 @@ def _squash_layers(layers_to_squash, squashed_tar_file, old_image_dir):
 
     log.debug("Squashing done!")
 
-def _remove_files_from_tar(files, tar):
-  log.debug("Removing following files: %s from %s archive..." % (" ".join(files), tar))
-  subprocess.check_output("tar -f %s --delete %s" % (tar, " ".join(files)), shell=True)
-
 def main(args):
 
   # The image id or name of the image to be squashed

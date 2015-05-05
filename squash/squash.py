@@ -15,12 +15,14 @@ import docker
 import logging
 import tarfile
 
-# TODO Maybe use Python's tarfile? Dunno if it's possible to append to a file
-
 d = docker.Client(base_url='unix://var/run/docker.sock', timeout = 240)
 
-logging.basicConfig(level=logging.DEBUG)
-log = logging.getLogger("squasher")
+log = logging.getLogger()
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+handler.setFormatter(formatter)
+log.addHandler(handler)
+log.setLevel(logging.DEBUG)
 
 def _read_layers(layers, image_id):
   """ Reads the JSON metadata for specified layer / image id """

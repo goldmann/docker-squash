@@ -47,19 +47,15 @@ def _save_image(image_id, tar_file):
 
   log.debug("Image saved!")
 
-def _unpack(tar, directory):
-  """ Unpacks the exported tar archive to selected directory """
+def _unpack(tar_file, directory):
+  """ Unpacks tar archive to selected directory """
 
-  log.debug("Unpacking %s tar file to %s directory" % (tar, directory))
+  log.debug("Unpacking %s tar file to %s directory" % (tar_file, directory))
 
-  try:
-    subprocess.check_output("tar -xf %s -C %s" % (tar, directory), shell=True)
-  except subprocess.CalledProcessError as e:
-    log.error(e)
-    log.error("Error while unpacking %s file to %s directory." % (tar, directory))
-    sys.exit(1)
+  with tarfile.open(tar_file, 'r') as tar:
+    tar.extractall(path=directory)
 
-  log.debug("Done!")
+  log.debug("Archive unpacked!")
 
 def _move_unmodified_layers(layers, squash_id, src, dest):
   """

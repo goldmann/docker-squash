@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import subprocess
 import json
 import argparse
 import tempfile
@@ -14,6 +13,7 @@ import datetime
 import docker
 import logging
 import tarfile
+import cStringIO
 
 d = docker.Client(base_url='unix://var/run/docker.sock', timeout = 240)
 
@@ -23,6 +23,18 @@ formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message
 handler.setFormatter(formatter)
 log.addHandler(handler)
 log.setLevel(logging.DEBUG)
+
+class Chdir:
+  """ Context manager for changing the current working directory """
+  def __init__(self, newPath):
+    self.newPath = os.path.expanduser(newPath)
+
+  def __enter__(self):
+    self.savedPath = os.getcwd()
+    os.chdir(self.newPath)
+
+  def __exit__(self, etype, value, traceback):
+    os.chdir(self.savedPath)
 
 def _read_layers(layers, image_id):
   """ Reads the JSON metadata for specified layer / image id """
@@ -124,13 +136,17 @@ def _generate_repositories_json(repositories_file, new_image_id, tag):
     json.dump(repos, f)
 
 def _load_image(directory):
+  c = cStringIO.StringIO()
+  t = tarfile.open(mode='w', fileobj=c)
 
-  try:
-    subprocess.check_output("cd %s && tar -cf - . | docker load" % directory, shell=True)
-  except subprocess.CalledProcessError as e:
-    print e
-    print "Error while loading the created image from %s directory." % directory
-    sys.exit(2)
+  with Chdir(directory):
+    t.add(".")
+
+  t.close()
+
+  d.load_image(c.getvalue())
+
+  c.close()
 
 def _layers_to_squash(layers, from_layer):
   """ Prepares a list of layer IDs that should be squashed """
@@ -194,7 +210,12 @@ def _squash_layers(layers_to_squash, squashed_tar_file, old_image_dir):
 def main(args):
 
   # The image id or name of the image to be squashed
-  old_image_id = args.image
+  try:
+    old_image_id = d.inspect_image(args.image)['Id']
+  except:
+    print "Could not get the image ID to squash, please check provided 'image' argument: %s" % args.image
+    sys.exit(1)
+
   # The id or name of the layer/image that the squashing should begin from
   # This layer WILL NOT be squashed, but all next layers will
   try:

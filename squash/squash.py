@@ -137,14 +137,16 @@ def _generate_repositories_json(repositories_file, new_image_id, tag):
 
 def _load_image(directory):
   c = cStringIO.StringIO()
-  t = tarfile.open(mode='w', fileobj=c)
 
-  with Chdir(directory):
-    t.add(".")
+  with tarfile.open(mode='w', fileobj=c) as tar:
+    log.debug("Generating tar archive for the squashed image...")
+    with Chdir(directory):
+      tar.add(".")
+    log.debug("Archive generated")
 
-  t.close()
-
+  log.debug("Uploading image...")
   d.load_image(c.getvalue())
+  log.debug("Image uploaded")
 
   c.close()
 

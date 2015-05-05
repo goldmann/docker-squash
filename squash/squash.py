@@ -169,7 +169,7 @@ def _prepare_tmp_directory(provided_tmp_dir):
   """ Creates temporary directory that is used to work on layers """
   if provided_tmp_dir:
     if os.path.exists(provided_tmp_dir):
-      print "The '%s' directory already exists, please remove it before you proceed, aborting." % provided_tmp_dir
+      log.error("The '%s' directory already exists, please remove it before you proceed, aborting." % provided_tmp_dir)
       sys.exit(1)
     os.makedirs(provided_tmp_dir)
     return provided_tmp_dir
@@ -215,7 +215,7 @@ def main(args):
   try:
     old_image_id = d.inspect_image(args.image)['Id']
   except:
-    print "Could not get the image ID to squash, please check provided 'image' argument: %s" % args.image
+    log.error("Could not get the image ID to squash, please check provided 'image' argument: %s" % args.image)
     sys.exit(1)
 
   # The id or name of the layer/image that the squashing should begin from
@@ -223,7 +223,7 @@ def main(args):
   try:
     squash_id = d.inspect_image(args.layer)['Id']
   except:
-    print "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % args.layer
+    log.error("Could not get the layer ID to squash, please check provided 'layer' argument: %s" % args.layer)
     sys.exit(1)
 
   old_layers = []
@@ -232,14 +232,14 @@ def main(args):
   _read_layers(old_layers, old_image_id)
 
   if not squash_id in old_layers:
-    print "Couldn't find the provided layer (%s) in the %s image" % (args.layer, args.image)
+    log.error("Couldn't find the provided layer (%s) in the %s image" % (args.layer, args.image))
     sys.exit(1)
 
   # Find the layers to squash
   layers_to_squash = _layers_to_squash(old_layers, squash_id)
 
   if len(layers_to_squash) == 0:
-    print "There are no layers to squash, aborting."
+    log.error("There are no layers to squash, aborting")
     sys.exit(1)
 
   # Prepare temporary directory where all the work will be executed

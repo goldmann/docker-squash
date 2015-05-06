@@ -79,33 +79,33 @@ def _move_unmodified_layers(layers, squash_id, src, dest):
   moved from the old image to the new image untouched.
   """
   for layer in layers:
-    LOG.debug("Moving umnodified layer %s..." % layer)
+    LOG.debug("Moving unmodified layer %s..." % layer)
     shutil.move(os.path.join(src, layer), dest)
     if layer == squash_id:
       # Stop if we are at the first layer that was squashed
       return
 
-def _files_to_skip(to_squash, old_image_dir):
-  to_skip = []
+def _marker_files(tar, layer_id):
+  """
+  Searches for marker files in the specified archive.
 
-  LOG.debug("Searching for marker files...")
+  Docker marker files are files taht have the .wh. prefix in the name.
+  These files mark the corresponding file to be removed (hidden) when
+  we start a container from the image.
+  """
+  marker_files = {}
 
-  for layer_id in to_squash:
-    layer_tar = os.path.join(old_image_dir, layer_id, "layer.tar")
+  LOG.debug("Searching for marker files in '%s' archive..." % tar.name)
 
-    LOG.debug("Searching for marker files in '%s' archive..." % layer_tar)
+  for member in tar.getmembers():
+    if '.wh.' in member.name:
+      LOG.debug("Found '%s' marker file" % member.name)
+      marker_files[member.name] = member
 
-    with tarfile.open(layer_tar, 'r') as tar:
-      for member in tar.getmembers():
-        if '.wh.' in member.name:
-          LOG.debug("Found '%s' marker file" % member.name)
-          to_skip.append(member.name)
-          to_skip.append(member.name.replace('.wh.', ''))
+  if marker_files:
+    LOG.debug("Following files are marked to skip in the %s layer: %s" % (layer_id, " ".join(marker_files.keys())))
 
-  if to_skip:
-    LOG.debug("Following files were found: %s" % " ".join(to_skip))
-
-  return to_skip
+  return marker_files
 
 def _generate_target_json(old_image_id, new_image_id, squash_id, squashed_dir):
   json_file = os.path.join(squashed_dir, "json")
@@ -183,37 +183,83 @@ def _prepare_tmp_directory(provided_tmp_dir):
     return tempfile.mkdtemp(prefix="tmp-docker-squash-")
 
 def _squash_layers(layers_to_squash, squashed_tar_file, old_image_dir):
+  # Reverse the layers to squash - we begin with the newest one
+  # to make the tar lighter
+  layers_to_squash.reverse()
 
-  # Find all files that should be skipped
-  #
-  # TODO: we probably should do it for current layer and
-  # apply only on the previous layer
-  to_skip = _files_to_skip(layers_to_squash, old_image_dir)
-
-  LOG.debug("Starting squashing...")
+  LOG.info("Starting squashing...")
 
   with tarfile.open(squashed_tar_file, 'w') as squashed_tar:
+    unskipped_markers = {}
 
     for layer_id in layers_to_squash:
       layer_tar_file = os.path.join(old_image_dir, layer_id, "layer.tar")
 
-      LOG.debug("Squashing layer %s..." % layer_id)
+      LOG.info("Squashing layer %s..." % layer_id)
 
       # Open the exiting layer to squash
       with tarfile.open(layer_tar_file, 'r') as layer_tar:
+        # Find all marker files for all layers
+        markers = _marker_files(layer_tar, layer_id)
+        tar_files = [o.name for o in layer_tar.getmembers()]
+
+        to_skip = []
+
+        for marker_name in unskipped_markers.keys():
+          actual_file = marker_name.replace('.wh.', '')
+
+          if actual_file in tar_files:
+            to_skip.append(marker_name)
+            to_skip.append(actual_file)
+            del(unskipped_markers[marker_name])
+
+        for marker_name, marker in markers.iteritems():
+          actual_file = marker_name.replace('.wh.', '')
+          to_skip.append(marker_name)
+
+          if actual_file in tar_files:
+            to_skip.append(actual_file)
+          else:
+            # We can safely add the file content, because marker files are empty
+            unskipped_markers[marker_name] = { 'file': layer_tar.extractfile(member), 'info': marker }
+
+        if to_skip:
+          LOG.debug("Following files are marked to skip when squashing layer %s: %s" % (layer_id, to_skip))
 
         # Copy all the files to the new tar
         for member in layer_tar.getmembers():
-          if not member.name in to_skip:
-            # Special case: symlinks
-            if member.issym():
-              squashed_tar.addfile(member)
-            else:
-              squashed_tar.addfile(member, layer_tar.extractfile(member))
-          else:
+          # Skip files that are marked to be skipped
+          if member.name in to_skip:
             LOG.debug("Skipping '%s' file because it's on the list to skip files" % member.name)
+            continue
 
-    LOG.debug("Squashing done!")
+          # List of filenames in the squashed archive
+          squashed_files = [o.name for o in squashed_tar.getmembers()]
+
+          # Check if file is already added to the archive
+          if member.name in squashed_files:
+            # File already exist in the squashed archive, skip it because
+            # file want to add is older than the one already in the archive.
+            # This is true because we do reverse squashing - from newer to older layer
+            LOG.debug("Skipping '%s' file because it's older than file already added to the archive" % member.name)
+            continue
+
+          if member.issym():
+            # Special case: symlinks
+            squashed_tar.addfile(member)
+          else:
+            # Finally add the file to archive
+            squashed_tar.addfile(member, layer_tar.extractfile(member))
+
+    # We copied all the files from all layers, but if there are
+    # still some marker files - we need to add them back because these
+    # remove (technically: hide) files from layers unaffected
+    # by squashing
+    for marker_name, marker in unskipped_markers.iteritems():
+      LOG.debug("Adding '%s' marker file back since the file it refers to was not found in any layers we squashed..." % marker_name)
+      squashed_tar.addfile(marker['info'], marker['file'])
+
+  LOG.debug("Squashing done!")
 
 def main(args):
 

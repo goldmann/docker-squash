@@ -45,8 +45,6 @@ def _read_layers(layers, image_id):
   if 'Parent' in layer and layer['Parent']:
     _read_layers(layers, layer['Parent'])
 
-  layers.reverse()
-
 def _save_image(image_id, tar_file):
   """ Saves the image as a tar archive under specified name """
 
@@ -75,7 +73,8 @@ def _move_unmodified_layers(layers, squash_id, src, dest):
   In other words - all layers that are not meant to be squashed will be
   moved from the old image to the new image untouched.
   """
-  for layer in reversed(layers):
+  for layer in layers:
+    log.debug("Moving umnodified layer %s..." % layer)
     shutil.move(os.path.join(src, layer), dest)
     if layer == squash_id:
       # Stop if we are at the first layer that was squashed
@@ -98,12 +97,14 @@ def _files_to_skip(to_squash, old_image_dir):
           to_skip.append(member.name)
           to_skip.append(member.name.replace('.wh.', ''))
 
-  log.debug("Following files were found: %s" % " ".join(to_skip))
+  if to_skip:
+    log.debug("Following files were found: %s" % " ".join(to_skip))
 
   return to_skip
 
 def _generate_target_json(old_image_id, new_image_id, squash_id, squashed_dir):
   json_file = os.path.join(squashed_dir, "json")
+  squashed_tar = os.path.join(squashed_dir, "layer.tar")
   # Read the original metadata
   metadata = d.inspect_image(old_image_id)
 
@@ -112,6 +113,7 @@ def _generate_target_json(old_image_id, new_image_id, squash_id, squashed_dir):
   metadata['Parent'] = squash_id
   metadata['Config']['Image'] = squash_id
   metadata['Created'] = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+  metadata['Size'] = os.path.getsize(squashed_tar)
 
   # Remove unnecessary fields
   del metadata['ContainerConfig']
@@ -152,7 +154,6 @@ def _load_image(directory):
 
 def _layers_to_squash(layers, from_layer):
   """ Prepares a list of layer IDs that should be squashed """
-
   to_squash = []
 
   for l in reversed(layers):
@@ -231,12 +232,20 @@ def main(args):
   # Read all layers in the image
   _read_layers(old_layers, old_image_id)
 
+  old_layers.reverse()
+
+  log.info("Old image has %s layers", len(old_layers))
+  log.debug("Old layers: %s", old_layers)
+
   if not squash_id in old_layers:
     log.error("Couldn't find the provided layer (%s) in the %s image" % (args.layer, args.image))
     sys.exit(1)
 
   # Find the layers to squash
   layers_to_squash = _layers_to_squash(old_layers, squash_id)
+
+  log.info("We have %s layers to squash", len(layers_to_squash))
+  log.debug("Layers to squash: %s", layers_to_squash)
 
   if len(layers_to_squash) == 0:
     log.error("There are no layers to squash, aborting")

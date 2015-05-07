@@ -347,8 +347,8 @@ def main(args):
     LOG.debug("Layers to squash: %s", layers_to_squash)
 
     if len(layers_to_squash) == 0:
-        LOG.error("There are no layers to squash, aborting")
-        sys.exit(1)
+        LOG.error("There are no layers to squash, exiting")
+        sys.exit(0)
 
     # Prepare temporary directory where all the work will be executed
     tmp_dir = _prepare_tmp_directory(args.tmp_dir)

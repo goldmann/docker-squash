@@ -244,7 +244,7 @@ def _squash_layers(layers_to_squash, squashed_tar_file, old_image_dir):
                         # We can safely add the file content, because marker
                         # files are empty
                         unskipped_markers[marker_name] = {
-                            'file': layer_tar.extractfile(member), 'info': marker}
+                            'file': layer_tar.extractfile(marker), 'info': marker}
 
                 if to_skip:
                     LOG.debug("Following files are marked to skip when squashing layer %s: %s" % (

@@ -27,7 +27,6 @@ _HANDLER = logging.StreamHandler()
 _FORMATTER = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 _HANDLER.setFormatter(_FORMATTER)
 LOG.addHandler(_HANDLER)
-LOG.setLevel(logging.DEBUG)
 
 class Chdir:
   """ Context manager for changing the current working directory """
@@ -53,24 +52,28 @@ def _read_layers(layers, image_id):
 def _save_image(image_id, tar_file):
   """ Saves the image as a tar archive under specified name """
 
-  LOG.debug("Saving image %s to %s file..." % (image_id, tar_file))
+  LOG.info("Saving image %s to %s file..." % (image_id, tar_file))
 
   image = DOCKER_CLIENT.get_image(image_id)
 
   with open(tar_file, 'w') as f:
     f.write(image.data)
 
-  LOG.debug("Image saved!")
+  LOG.info("Image saved!")
 
 def _unpack(tar_file, directory):
   """ Unpacks tar archive to selected directory """
 
-  LOG.debug("Unpacking %s tar file to %s directory" % (tar_file, directory))
+  LOG.info("Unpacking %s tar file to %s directory" % (tar_file, directory))
 
   with tarfile.open(tar_file, 'r') as tar:
     tar.extractall(path=directory)
 
-  LOG.debug("Archive unpacked!")
+  # Remove the tar file early to save some space
+  LOG.debug("Removing exported tar (%s)..." % tar_file)
+  os.remove(tar_file)
+
+  LOG.info("Archive unpacked!")
 
 def _move_unmodified_layers(layers, squash_id, src, dest):
   """
@@ -151,9 +154,9 @@ def _load_image(directory):
       tar.add(".")
     LOG.debug("Archive generated")
 
-  LOG.debug("Uploading image...")
+  LOG.info("Loading squashed image...")
   DOCKER_CLIENT.load_image(c.getvalue())
-  LOG.debug("Image uploaded")
+  LOG.info("Image loaded!")
 
   c.close()
 
@@ -263,6 +266,11 @@ def _squash_layers(layers_to_squash, squashed_tar_file, old_image_dir):
 
 def main(args):
 
+  if args.verbose:
+    LOG.setLevel(logging.DEBUG)
+  else:
+    LOG.setLevel(logging.INFO)
+
   # The image id or name of the image to be squashed
   try:
     old_image_id = DOCKER_CLIENT.inspect_image(args.image)['Id']
@@ -278,6 +286,13 @@ def main(args):
     LOG.error("Could not get the layer ID to squash, please check provided 'layer' argument: %s" % args.layer)
     sys.exit(1)
 
+  if ':' in args.tag:
+    tag = args.tag
+  else:
+    tag = "%s:latest" % args.tag
+
+  LOG.info("Attempting to squash image %s...", old_image_id)
+
   old_layers = []
 
   # Read all layers in the image
@@ -291,6 +306,8 @@ def main(args):
   if not squash_id in old_layers:
     LOG.error("Couldn't find the provided layer (%s) in the %s image" % (args.layer, args.image))
     sys.exit(1)
+
+  LOG.info("We will squash from layer %s", squash_id)
 
   # Find the layers to squash
   layers_to_squash = _layers_to_squash(old_layers, squash_id)
@@ -316,12 +333,7 @@ def main(args):
   os.makedirs(old_image_dir)
 
   # Unpack the image
-  LOG.info("Unpacking exported tar (%s)..." % old_image_tar)
   _unpack(old_image_tar, old_image_dir)
-
-  # Remove the tar file early to save some space
-  LOG.info("Removing exported tar (%s)..." % old_image_tar)
-  os.remove(old_image_tar)
 
   # Directory where the new layers will be unpacked in prepareation to
   # import it to Docker
@@ -350,7 +362,7 @@ def main(args):
   _generate_target_json(old_image_id, new_image_id, squash_id, squashed_dir)
 
   # Generate the metadata JSON with information about the images
-  _generate_repositories_json(os.path.join(new_image_dir, "repositories"), new_image_id, args.tag)
+  _generate_repositories_json(os.path.join(new_image_dir, "repositories"), new_image_id, tag)
 
   # And finally tar everything up and load into Docker
   _load_image(new_image_dir)
@@ -358,12 +370,15 @@ def main(args):
   # Cleanup the temporary directory
   shutil.rmtree(tmp_dir)
 
+  LOG.info("Finished, image registered as %s", tag)
+
 if __name__ == "__main__":
   PARSER = argparse.ArgumentParser(description='Squashes all layers in the image from the layer specified as "layer" argument.')
   PARSER.add_argument('image', help='Image to be squashed')
   PARSER.add_argument('layer', help='ID of the layer or image ID or image name')
   PARSER.add_argument('tag', help='Specify the tag to be used for the new image')
   PARSER.add_argument('-t', '--tmp-dir', help='Temporary directory to be used')
+  PARSER.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
   ARGS = PARSER.parse_args()
 
   main(ARGS)

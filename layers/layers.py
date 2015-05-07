@@ -116,4 +116,4 @@ if __name__ == "__main__":
   PARSER.add_argument('-t', '--tags', action='store_true', help='Print layer tags if available')
   ARGS = PARSER.parse_args()
 
-  main(args)
+  main(ARGS)

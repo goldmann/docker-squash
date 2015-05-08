@@ -154,13 +154,7 @@ def _generate_target_json(old_image_id, new_image_id, squash_id, squashed_dir):
         json.dump(metadata, f)
 
 
-def _generate_repositories_json(repositories_file, new_image_id, tag):
-    if ':' in tag:
-        name, tag = tag.split(':')
-    else:
-        name = tag
-        tag = "latest"
-
+def _generate_repositories_json(repositories_file, new_image_id, name, tag):
     repos = {}
     repos[name] = {}
     repos[name][tag] = new_image_id
@@ -222,6 +216,17 @@ def _prepare_tmp_directory(provided_tmp_dir):
         return provided_tmp_dir
     else:
         return tempfile.mkdtemp(prefix="tmp-docker-squash-")
+
+
+def _parse_image_name(image):
+    if ':' in image and not '/' in image.split(':')[-1]:
+        image_tag = image.split(':')[-1]
+        image_name = image[:-(len(image_tag)+1)]
+    else:
+        image_tag = "latest"
+        image_name = image
+
+    return (image_name, image_tag)
 
 
 def _squash_layers(layers_to_squash, squashed_tar_file, old_image_dir):
@@ -331,12 +336,9 @@ def main(args):
         sys.exit(1)
 
     if args.tag:
-        if ':' in args.tag:
-            tag = args.tag
-        else:
-            tag = "%s:latest" % args.tag
+        image_name, image_tag = _parse_image_name(args.tag)
     else:
-        tag = args.image
+        image_name, image_tag = _parse_image_name(args.image)
 
     old_layers = []
 
@@ -426,7 +428,7 @@ def main(args):
 
     # Generate the metadata JSON with information about the images
     _generate_repositories_json(
-        os.path.join(new_image_dir, "repositories"), new_image_id, tag)
+        os.path.join(new_image_dir, "repositories"), new_image_id, image_name, image_tag)
 
     # And finally tar everything up and load into Docker
     _load_image(new_image_dir)
@@ -434,7 +436,7 @@ def main(args):
     # Cleanup the temporary directory
     shutil.rmtree(tmp_dir)
 
-    LOG.info("Finished, image registered as '%s'", tag)
+    LOG.info("Finished, image registered as '%s:%s'" % (image_name, image_tag))
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser(

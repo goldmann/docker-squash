@@ -328,19 +328,13 @@ def main(args):
             "Could not get the image ID to squash, please check provided 'image' argument: %s" % args.image)
         sys.exit(1)
 
-    # The id or name of the layer/image that the squashing should begin from
-    # This layer WILL NOT be squashed, but all next layers will
-    try:
-        squash_id = DOCKER_CLIENT.inspect_image(args.layer)['Id']
-    except:
-        LOG.error(
-            "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % args.layer)
-        sys.exit(1)
-
-    if ':' in args.tag:
-        tag = args.tag
+    if args.tag:
+        if ':' in args.tag:
+            tag = args.tag
+        else:
+            tag = "%s:latest" % args.tag
     else:
-        tag = "%s:latest" % args.tag
+        tag = old_image_id
 
     LOG.info("Attempting to squash image %s...", old_image_id)
 
@@ -350,6 +344,20 @@ def main(args):
     _read_layers(old_layers, old_image_id)
 
     old_layers.reverse()
+
+    # The id or name of the layer/image that the squashing should begin from
+    # This layer WILL NOT be squashed, but all next layers will
+    if args.from_layer:
+      from_layer = args.from_layer
+    else:
+      from_layer = old_layers[0]
+
+    try:
+        squash_id = DOCKER_CLIENT.inspect_image(from_layer)['Id']
+    except:
+        LOG.error(
+            "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % from_layer)
+        sys.exit(1)
 
     LOG.info("Old image has %s layers", len(old_layers))
     LOG.debug("Old layers: %s", old_layers)
@@ -432,11 +440,11 @@ if __name__ == "__main__":
         description='Squashes all layers in the image from the layer specified as "layer" argument.')
     PARSER.add_argument('image', help='Image to be squashed')
     PARSER.add_argument(
-        'layer', help='ID of the layer or image ID or image name')
+        '-f', '--from-layer', help='ID of the layer or image ID or image name. If not specified will squash up to last layer (FROM instruction)')
     PARSER.add_argument(
-        'tag', help='Specify the tag to be used for the new image')
+        '-t', '--tag', help="Specify the tag to be used for the new image. By default it'll be set to 'image' argument")
     PARSER.add_argument(
-        '-t', '--tmp-dir', help='Temporary directory to be used')
+        '--tmp-dir', help='Temporary directory to be used')
     PARSER.add_argument(
         '-v', '--verbose', action='store_true', help='Verbose output')
     ARGS = PARSER.parse_args()

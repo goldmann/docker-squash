@@ -58,15 +58,25 @@ def _read_layers(layers, image_id):
 def _save_image(image_id, tar_file):
     """ Saves the image as a tar archive under specified name """
 
-    LOG.info("Saving image %s to %s file..." % (image_id, tar_file))
+    for x in xrange(3):
+        LOG.info("Saving image %s to %s file..." % (image_id, tar_file))
+        LOG.debug("Try #%s..." % (x+1))
 
-    image = DOCKER_CLIENT.get_image(image_id)
+        try:
+            image = DOCKER_CLIENT.get_image(image_id)
 
-    with open(tar_file, 'w') as f:
-        f.write(image.data)
+            with open(tar_file, 'w') as f:
+                f.write(image.data)
 
-    LOG.info("Image saved!")
+            LOG.info("Image saved!")
+            return True
+        except Exception as e:
+            LOG.exception(e)
+            LOG.warn("An error occured while saving the %s image, retrying..." % image_id)
 
+    LOG.error("Couldn't save %s image!" % image_id)
+
+    return False
 
 def _unpack(tar_file, directory):
     """ Unpacks tar archive to selected directory """
@@ -357,7 +367,8 @@ def main(args):
     old_image_tar = os.path.join(tmp_dir, "image.tar")
 
     # Save the image in tar format in the tepmorary directory
-    _save_image(old_image_id, old_image_tar)
+    if not _save_image(old_image_id, old_image_tar):
+      sys.exit(1)
 
     # Directory where the old layers will be unpacked
     old_image_dir = os.path.join(tmp_dir, "old")

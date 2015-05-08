@@ -169,6 +169,17 @@ def _generate_repositories_json(repositories_file, new_image_id, tag):
         json.dump(repos, f)
 
 
+def _generate_image_id():
+    while True:
+        image_id = hashlib.sha256(str(random.getrandbits(128))).hexdigest()
+
+        try:
+            int(image_id[0:10])
+        except ValueError:
+            # All good!
+            return image_id
+
+
 def _load_image(directory):
     c = cStringIO.StringIO()
 
@@ -383,7 +394,7 @@ def main(args):
     os.makedirs(new_image_dir)
 
     # Generate a new image id for the squashed layer
-    new_image_id = hashlib.sha256(str(random.getrandbits(128))).hexdigest()
+    new_image_id = _generate_image_id()
 
     LOG.info("New layer ID for squashed content will be: %s" % new_image_id)
 

@@ -336,7 +336,7 @@ def main(args):
         else:
             tag = "%s:latest" % args.tag
     else:
-        tag = old_image_id
+        tag = args.image
 
     old_layers = []
 

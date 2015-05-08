@@ -320,6 +320,8 @@ def main(args):
     else:
         LOG.setLevel(logging.INFO)
 
+    LOG.info("Squashing image '%s'..." % args.image )
+
     # The image id or name of the image to be squashed
     try:
         old_image_id = DOCKER_CLIENT.inspect_image(args.image)['Id']
@@ -335,8 +337,6 @@ def main(args):
             tag = "%s:latest" % args.tag
     else:
         tag = old_image_id
-
-    LOG.info("Attempting to squash image %s...", old_image_id)
 
     old_layers = []
 
@@ -367,17 +367,18 @@ def main(args):
             args.layer, args.image))
         sys.exit(1)
 
-    LOG.info("We will squash from layer %s", squash_id)
-
     # Find the layers to squash
     layers_to_squash = _layers_to_squash(old_layers, squash_id)
 
+    LOG.info("Attepmting to squash from layer %s...", squash_id)
+    LOG.info("Checking if squashing is necessary...")
+
+    if len(layers_to_squash) <= 1:
+        LOG.warning("%s layer(s) in this image marked to squash, no squashing is required, exiting" % len(layers_to_squash))
+        sys.exit(0)
+
     LOG.info("We have %s layers to squash", len(layers_to_squash))
     LOG.debug("Layers to squash: %s", layers_to_squash)
-
-    if len(layers_to_squash) == 0:
-        LOG.error("There are no layers to squash, exiting")
-        sys.exit(0)
 
     # Prepare temporary directory where all the work will be executed
     tmp_dir = _prepare_tmp_directory(args.tmp_dir)
@@ -433,7 +434,7 @@ def main(args):
     # Cleanup the temporary directory
     shutil.rmtree(tmp_dir)
 
-    LOG.info("Finished, image registered as %s", tag)
+    LOG.info("Finished, image registered as '%s'", tag)
 
 if __name__ == "__main__":
     PARSER = argparse.ArgumentParser(

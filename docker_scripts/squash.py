@@ -48,7 +48,7 @@ class Squash:
         layers.append(layer['Id'])
 
         if 'Parent' in layer and layer['Parent']:
-            _read_layers(layers, layer['Parent'])
+            self._read_layers(layers, layer['Parent'])
 
     def _save_image(self, image_id, tar_file):
         """ Saves the image as a tar archive under specified name """
@@ -237,7 +237,7 @@ class Squash:
                 # Open the exiting layer to squash
                 with tarfile.open(layer_tar_file, 'r') as layer_tar:
                     # Find all marker files for all layers
-                    markers = _marker_files(layer_tar, layer_id)
+                    markers = self._marker_files(layer_tar, layer_id)
                     tar_files = [o.name for o in layer_tar.getmembers()]
 
                     to_skip = []
@@ -320,14 +320,14 @@ class Squash:
             sys.exit(1)
 
         if self.tag:
-            image_name, image_tag = _parse_image_name(self.tag)
+            image_name, image_tag = self._parse_image_name(self.tag)
         else:
-            image_name, image_tag = _parse_image_name(self.image)
+            image_name, image_tag = self._parse_image_name(self.image)
 
         old_layers = []
 
         # Read all layers in the image
-        _read_layers(old_layers, old_image_id)
+        self._read_layers(old_layers, old_image_id)
 
         old_layers.reverse()
 
@@ -354,7 +354,7 @@ class Squash:
             sys.exit(1)
 
         # Find the layers to squash
-        layers_to_squash = _layers_to_squash(old_layers, squash_id)
+        layers_to_squash = self._layers_to_squash(old_layers, squash_id)
 
         self.log.info("Attepmting to squash from layer %s...", squash_id)
         self.log.info("Checking if squashing is necessary...")
@@ -368,13 +368,13 @@ class Squash:
         self.log.debug("Layers to squash: %s", layers_to_squash)
 
         # Prepare temporary directory where all the work will be executed
-        tmp_dir = _prepare_tmp_directory(self.tmp_dir)
+        tmp_dir = self._prepare_tmp_directory(self.tmp_dir)
 
         # Location of the tar with the old image
         old_image_tar = os.path.join(tmp_dir, "image.tar")
 
         # Save the image in tar format in the tepmorary directory
-        if not _save_image(old_image_id, old_image_tar):
+        if not self._save_image(old_image_id, old_image_tar):
             sys.exit(1)
 
         # Directory where the old layers will be unpacked
@@ -382,7 +382,7 @@ class Squash:
         os.makedirs(old_image_dir)
 
         # Unpack the image
-        _unpack(old_image_tar, old_image_dir)
+        self._unpack(old_image_tar, old_image_dir)
 
         # Directory where the new layers will be unpacked in prepareation to
         # import it to Docker
@@ -390,7 +390,7 @@ class Squash:
         os.makedirs(new_image_dir)
 
         # Generate a new image id for the squashed layer
-        new_image_id = _generate_image_id()
+        new_image_id = self._generate_image_id()
 
         self.log.info(
             "New layer ID for squashed content will be: %s" % new_image_id)
@@ -403,22 +403,22 @@ class Squash:
         squashed_tar = os.path.join(squashed_dir, "layer.tar")
 
         # Append all the layers on each other
-        _squash_layers(layers_to_squash, squashed_tar, old_image_dir)
+        self._squash_layers(layers_to_squash, squashed_tar, old_image_dir)
 
         # Move all the layers that should be untouched
-        _move_unmodified_layers(
+        self._move_unmodified_layers(
             old_layers, squash_id, old_image_dir, new_image_dir)
 
         # Generate the metadata JSON based on the original one
-        _generate_target_json(
+        self._generate_target_json(
             old_image_id, new_image_id, squash_id, squashed_dir)
 
         # Generate the metadata JSON with information about the images
-        _generate_repositories_json(
+        self._generate_repositories_json(
             os.path.join(new_image_dir, "repositories"), new_image_id, image_name, image_tag)
 
         # And finally tar everything up and load into Docker
-        _load_image(new_image_dir)
+        self._load_image(new_image_dir)
 
         # Cleanup the temporary directory
         shutil.rmtree(tmp_dir)

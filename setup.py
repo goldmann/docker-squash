@@ -12,7 +12,9 @@ setup(
     url='https://github.com/goldmann/docker-scripts',
     author='Marek Goldmann',
     author_email='marek.goldmann@gmail.com',
+    description = 'A swiss-knife tool that could be useful for people working with Docker',
     license='MIT',
+    keywords = 'docker'
     entry_points={
         'console_scripts': ['docker-scripts=docker_scripts.cli.main:run'],
     },

@@ -1,6 +1,6 @@
+# `docker-scripts`
 
-
-A swiss-knife tool for Docker with that could be useful for people working with Docker.
+A swiss-knife tool that could be useful for people working with Docker.
 
 ## Features
 

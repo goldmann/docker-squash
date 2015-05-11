@@ -57,8 +57,8 @@ Layers
 
 Simple script to show all the layers of which the image is built.
 
-Usage
-~~~~
+Layers usage
+~~~~~~~~~~~~
 
 ::
 
@@ -76,7 +76,7 @@ Usage
       -t, --tags        Print layer tags if available
 
 Examples
-~~~~~~~
+~~~~~~~~
 
 Default output
 ^^^^^^^^^^^^^^
@@ -131,7 +131,7 @@ Output with commands
                       └─ 2ac466861ca121d4c5e17970f4939cc3df3755a7fd90a6d11542b7432c03e215 [/bin/sh -c #(nop) CMD [/opt/jboss/wildfly/bin/standalone.sh -b 0.0.0.0]]
 
 Machine parseable output
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 ::
 
@@ -150,7 +150,7 @@ Machine parseable output
     b621dc5d4989677e62bf8ee0316f557156b5cba2b551e8bbb6368fb5920ae3aa|/bin/sh -c #(nop) CMD [/bin/sh -c /opt/torquebox-$TORQUEBOX_VERSION/jboss/bin/standalone.sh -b 0.0.0.0]
 
 Show tags if available
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 **NOTE:** Only tags available locally will be shown.
 
@@ -187,8 +187,8 @@ Squashing helps with organizing images in logical layers. Instead of
 having an image with multiple (in almost all cases) unnecessary layers -
 we can control the structure of the image.
 
-Usage
-~~~~
+Squashing usage
+~~~~~~~~~~~~~~~
 
 ::
 
@@ -210,7 +210,7 @@ Usage
       --tmp-dir TMP_DIR     Temporary directory to be used
 
 Example
-~~~~~~
+~~~~~~~
 
 We start with image like this:
 

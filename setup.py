@@ -15,6 +15,7 @@ setup(
     description = 'A swiss-knife tool that could be useful for people working with Docker',
     license='MIT',
     keywords = 'docker',
+    long_description=open('README.md').read(),
     entry_points={
         'console_scripts': ['docker-scripts=docker_scripts.cli.main:run'],
     },

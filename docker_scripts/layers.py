@@ -106,14 +106,3 @@ def main(args):
       print line.encode("UTF-8")
 
     i += 1
-
-if __name__ == "__main__":
-  PARSER = argparse.ArgumentParser(description='Print information about layers.')
-  PARSER.add_argument('layer', help='ID of the layer or image ID or image name')
-  PARSER.add_argument('-c', '--commands', action='store_true', help='Show commands executed to create the layer (if any)')
-  PARSER.add_argument('-d', '--dockerfile', action='store_true', help='Create Dockerfile out of the layers [EXPERIMENTAL!]')
-  PARSER.add_argument('-m', '--machine', action='store_true', help='Machine parseable output')
-  PARSER.add_argument('-t', '--tags', action='store_true', help='Print layer tags if available')
-  ARGS = PARSER.parse_args()
-
-  main(ARGS)

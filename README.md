@@ -42,6 +42,10 @@ Available commands:
     layers         Show layers in the specified image
 ```
 
+## License
+
+MIT
+
 ## Layers
 
 Simple script to show all the layers of which the image is built.

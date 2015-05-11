@@ -1,108 +1,89 @@
 # -*- coding: utf-8 -*-
 
-import sys
-import subprocess
-import json
-import argparse
 
-def to_camel_case(s):
-  if not "_" in s:
-    return s[0].upper() + s[1:]
+class Layers:
 
-  return "".join(x.title() for x in s.split("_"))
+    def __init__(self, log, docker, image, commands=False, dockerfile=False, machine=False, tags=False):
+        self.log = log
+        self.docker = docker
+        self.image = image
+        self.commands = commands
+        self.dockerfile = dockerfile
+        self.machine = machine
+        self.tags = tags
 
-def read_layer(layers, image_id):
-  try:
-    output = subprocess.check_output("docker inspect %s" % image_id, shell=True, stderr=subprocess.STDOUT)
-  except subprocess.CalledProcessError as e:
-    print "Error while getting information about image / layer '%s'. Please make sure you specified correct information." % image_id
-    sys.exit(2)
+    def _read_layer(self, layers, image_id):
+        metadata = self.docker.inspect_image(image_id)
+        layers.append(metadata)
 
-  metadata = json.loads(output)[0]
+        if 'Parent' in metadata and metadata['Parent']:
+            self._read_layer(layers, metadata['Parent'])
 
-  m = {}
+    def _read_tags(self):
+        images = self.docker.images(all=True)
+        tags = {}
 
-  for k in metadata:
-    m[to_camel_case(k)] = metadata[k]
+        for image in images:
+            if len(image['RepoTags']) == 1 and image['RepoTags'][0] == '<none>:<none>':
+                continue
 
-  layers.append(m)
+            tags[image['Id']] = image['RepoTags']
 
-  if 'Parent' in m and m['Parent']:
-    read_layer(layers, m['Parent'])
+        return tags
 
-def read_tags():
-  try:
-    output = subprocess.check_output("docker images --no-trunc", shell=True, stderr=subprocess.STDOUT)
-  except subprocess.CalledProcessError as e:
-    print "Error while getting information about tags for image / layer '%s'. Please make sure you specified correct information." % image_id
-    sys.exit(2)
+    def run(self):
 
-  tags = {}
+        image_id = self.image
+        layers = []
+        self._read_layer(layers, image_id)
+        layers.reverse()
 
-  for l in output.strip().splitlines()[1:]:
-    data = " ".join(l.split()).split()
+        if self.tags:
+            tags = self._read_tags()
 
-    if data[0] == "<none>":
-      continue
+        i = 0
 
-    if not data[2] in tags:
-      tags[data[2]] = []
+        for l in layers:
 
-    tags[data[2]].append(data[0] + ":" + data[1])
+            command = None
 
-  return tags
+            if 'ContainerConfig' in l and l['ContainerConfig'] and l['ContainerConfig']['Cmd']:
+                command = " ".join(l['ContainerConfig']['Cmd'])
 
-def main(args):
+            if self.dockerfile:
+                if not command:
+                    print "FROM %s" % l['Id']
+                else:
+                    if l['ContainerConfig']['Cmd'][-1].startswith("#(nop) "):
+                        # TODO: special case: ADD
+                        # TODO: special case: EXPOSE
+                        print l['ContainerConfig']['Cmd'][-1].split("#(nop) ")[-1]
+                    else:
+                        print "RUN %s" % l['ContainerConfig']['Cmd'][-1]
+            else:
+                if self.machine:
+                    line = l['Id']
+                    if self.commands:
+                        line += "|"
+                        if command:
+                            line += "%s" % command
+                else:
+                    line = "%s" % " " * i
 
-  image_id = args.layer
-  layers = []
-  read_layer(layers, image_id)
-  layers.reverse()
+                    if l != layers[0]:
+                        line += u'└─ '
 
-  if args.tags:
-    tags = read_tags()
+                    line += "%s" % l['Id']
 
-  i = 0
+                    if self.commands and command:
+                        line += " [%s]" % command
 
-  for l in layers:
-    command = None
+                    if self.tags:
 
-    if 'ContainerConfig' in l and l['ContainerConfig'] and l['ContainerConfig']['Cmd']:
-      command = " ".join(l['ContainerConfig']['Cmd'])
+                        if l['Id'] in tags.keys():
+                            # Poor man's sorting
+                            line += " %s" % sorted(tags[l['Id']])
 
-    if args.dockerfile:
-      if not command:
-        print "FROM %s" % l['Id']
-      else:
-        if l['ContainerConfig']['Cmd'][-1].startswith("#(nop) "):
-          # TODO: special case: ADD
-          # TODO: special case: EXPOSE
-          print l['ContainerConfig']['Cmd'][-1].split("#(nop) ")[-1]
-        else:
-          print "RUN %s" % l['ContainerConfig']['Cmd'][-1]
-    else:
-      if args.machine:
-        line = l['Id']
-        if args.commands:
-          line += "|"
-          if command:
-            line += "%s" % command
-      else:
-        line = "%s" % " " * i
+                print line.encode("UTF-8")
 
-        if l != layers[0]:
-          line += u'└─ '
-
-        line += "%s" % l['Id']
-
-        if args.commands and command:
-          line += " [%s]" % command
-
-        if args.tags:
-          if l['Id'] in tags:
-            # Poor man's sorting
-            line += " %s" % sorted(tags[l['Id']])
-
-      print line.encode("UTF-8")
-
-    i += 1
+            i += 1

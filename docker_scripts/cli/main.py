@@ -36,7 +36,8 @@ class CLI:
                       from_layer=args.from_layer, tag=args.tag).run()
 
     def run_layers(self, args):
-        layers.main(args)
+        layers.Layers(log=self.log, image=args.image, docker=self.docker,
+                      dockerfile=args.dockerfile, tags=args.tags, machine=args.machine, commands=args.commands).run()
 
     def _init_docker():
         pass
@@ -67,7 +68,7 @@ class CLI:
             'layers', help='Show layers in the specified image')
         parser_layers.set_defaults(func=self.run_layers)
         parser_layers.add_argument(
-            'layer', help='ID of the layer or image ID or image name')
+            'image', help='ID of the layer or image ID or image name')
         parser_layers.add_argument('-c', '--commands', action='store_true',
                                    help='Show commands executed to create the layer (if any)')
         parser_layers.add_argument('-d', '--dockerfile', action='store_true',

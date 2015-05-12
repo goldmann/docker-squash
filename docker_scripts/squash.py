@@ -356,7 +356,7 @@ class Squash:
         # Find the layers to squash
         layers_to_squash = self._layers_to_squash(old_layers, squash_id)
 
-        self.log.info("Attepmting to squash from layer %s...", squash_id)
+        self.log.info("Attempting to squash from layer %s...", squash_id)
         self.log.info("Checking if squashing is necessary...")
 
         if len(layers_to_squash) <= 1:

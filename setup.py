@@ -17,7 +17,7 @@ setup(
     keywords = 'docker',
     long_description=open('README.rst').read(),
     entry_points={
-        'console_scripts': ['docker-scripts=docker_scripts.cli.main:run'],
+        'console_scripts': ['docker-scripts=docker_scripts.cli:run'],
     },
     install_requires=requirements
 )

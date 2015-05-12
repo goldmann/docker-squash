@@ -68,6 +68,10 @@ class Layers:
             else:
                 if self.machine:
                     line = l['Id']
+                    if self.tags:
+                        line += "|"
+                        if l['Id'] in tags:
+                            line += "%s" % ",".join(sorted(tags[l['Id']]))
                     if self.commands:
                         line += "|"
                         if command:

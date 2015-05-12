@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import common
+
 
 class Layers:
 
-    def __init__(self, log, docker, image, commands=False, dockerfile=False, machine=False, tags=False):
+    def __init__(self, log, image, docker=None, commands=False, dockerfile=False, machine=False, tags=False):
         self.log = log
         self.docker = docker
         self.image = image
@@ -11,6 +13,9 @@ class Layers:
         self.dockerfile = dockerfile
         self.machine = machine
         self.tags = tags
+
+        if not docker:
+            self.docker = common.docker_client()
 
     def _read_layer(self, layers, image_id):
         metadata = self.docker.inspect_image(image_id)

@@ -15,6 +15,8 @@ import logging
 import tarfile
 import cStringIO
 
+import common
+
 
 class Chdir:
 
@@ -33,13 +35,16 @@ class Chdir:
 
 class Squash:
 
-    def __init__(self, log, docker, image, from_layer=None, tag=None, tmp_dir=None):
+    def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None):
         self.log = log
         self.docker = docker
         self.image = image
         self.from_layer = from_layer
         self.tag = tag
         self.tmp_dir = tmp_dir
+
+        if not docker:
+            self.docker = common.docker_client()
 
     def _read_layers(self, layers, image_id):
         """ Reads the JSON metadata for specified layer / image id """

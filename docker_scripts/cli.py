@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-import docker
 import logging
 import sys
 
@@ -26,17 +25,12 @@ class CLI:
         handler.setFormatter(formatter)
         self.log.addHandler(handler)
 
-        # TODO: This could be made configurable later
-        self.docker = docker.Client(
-            base_url='unix://var/run/docker.sock',
-            timeout=240)
-
     def run_squash(self, args):
-        squash.Squash(log=self.log, image=args.image, docker=self.docker,
+        squash.Squash(log=self.log, image=args.image,
                       from_layer=args.from_layer, tag=args.tag).run()
 
     def run_layers(self, args):
-        layers.Layers(log=self.log, image=args.image, docker=self.docker,
+        layers.Layers(log=self.log, image=args.image,
                       dockerfile=args.dockerfile, tags=args.tags, machine=args.machine, commands=args.commands).run()
 
     def _init_docker():

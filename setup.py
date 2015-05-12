@@ -7,7 +7,7 @@ with open('requirements.txt') as f:
 
 setup(
     name = "docker-scripts",
-    version = "0.3.0",
+    version = "0.3.1",
     packages = find_packages(),
     url='https://github.com/goldmann/docker-scripts',
     author='Marek Goldmann',

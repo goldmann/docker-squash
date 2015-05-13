@@ -2,6 +2,8 @@
 
 from setuptools import setup, find_packages
 
+import codecs
+
 version = "0.3.3"
 
 with open('requirements.txt') as f:
@@ -18,7 +20,7 @@ setup(
     description = 'A swiss-knife tool that could be useful for people working with Docker',
     license='MIT',
     keywords = 'docker',
-    long_description = open('README.rst').read(),
+    long_description = codecs.open('README.rst', encoding="utf8").read(),
     entry_points = {
         'console_scripts': ['docker-scripts=docker_scripts.cli:run'],
     },

@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 import codecs
 
-version = "0.3.3"
+version = "0.3.4"
 
 with open('requirements.txt') as f:
     requirements = f.read().splitlines()

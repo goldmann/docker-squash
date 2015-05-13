@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import common
+from .lib import common
 
 
 class Layers:
@@ -57,14 +57,15 @@ class Layers:
 
             if self.dockerfile:
                 if not command:
-                    print "FROM %s" % l['Id']
+                    print("FROM %s" % l['Id'])
                 else:
                     if l['ContainerConfig']['Cmd'][-1].startswith("#(nop) "):
                         # TODO: special case: ADD
                         # TODO: special case: EXPOSE
-                        print l['ContainerConfig']['Cmd'][-1].split("#(nop) ")[-1]
+                        print(
+                            l['ContainerConfig']['Cmd'][-1].split("#(nop) ")[-1])
                     else:
-                        print "RUN %s" % l['ContainerConfig']['Cmd'][-1]
+                        print("RUN %s" % l['ContainerConfig']['Cmd'][-1])
             else:
                 if self.machine:
                     line = l['Id']
@@ -93,6 +94,6 @@ class Layers:
                             # Poor man's sorting
                             line += " %s" % sorted(tags[l['Id']])
 
-                print line.encode("UTF-8")
+                print(line.encode("UTF-8"))
 
             i += 1

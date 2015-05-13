@@ -13,9 +13,14 @@ import datetime
 import docker
 import logging
 import tarfile
-import cStringIO
 
-import common
+import six
+from six.moves import cStringIO
+
+from .lib import common
+
+if six.PY2:
+    import lib.xtarfile
 
 
 class Chdir:
@@ -58,7 +63,7 @@ class Squash:
     def _save_image(self, image_id, tar_file):
         """ Saves the image as a tar archive under specified name """
 
-        for x in xrange(3):
+        for x in six.moves.range(3):
             self.log.info("Saving image %s to %s file..." %
                           (image_id, tar_file))
             self.log.debug("Try #%s..." % (x + 1))
@@ -66,7 +71,7 @@ class Squash:
             try:
                 image = self.docker.get_image(image_id)
 
-                with open(tar_file, 'w') as f:
+                with open(tar_file, 'wb') as f:
                     f.write(image.data)
 
                 self.log.info("Image saved!")
@@ -164,7 +169,8 @@ class Squash:
 
     def _generate_image_id(self):
         while True:
-            image_id = hashlib.sha256(str(random.getrandbits(128))).hexdigest()
+            image_id = hashlib.sha256(
+                str(random.getrandbits(128)).encode('utf8')).hexdigest()
 
             try:
                 int(image_id[0:10])
@@ -173,19 +179,19 @@ class Squash:
                 return image_id
 
     def _load_image(self, directory):
-        c = cStringIO.StringIO()
+        buf = six.BytesIO()
 
-        with tarfile.open(mode='w', fileobj=c) as tar:
+        with tarfile.open(mode='w', fileobj=buf) as tar:
             self.log.debug("Generating tar archive for the squashed image...")
             with Chdir(directory):
                 tar.add(".")
             self.log.debug("Archive generated")
 
         self.log.info("Loading squashed image...")
-        self.docker.load_image(c.getvalue())
+        self.docker.load_image(buf.getvalue())
         self.log.info("Image loaded!")
 
-        c.close()
+        buf.close()
 
     def _layers_to_squash(self, layers, from_layer):
         """ Prepares a list of layer IDs that should be squashed """
@@ -230,7 +236,7 @@ class Squash:
 
         self.log.info("Starting squashing...")
 
-        with tarfile.open(squashed_tar_file, 'w') as squashed_tar:
+        with tarfile.open(squashed_tar_file, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
             unskipped_markers = {}
 
             for layer_id in layers_to_squash:
@@ -240,7 +246,7 @@ class Squash:
                 self.log.info("Squashing layer %s..." % layer_id)
 
                 # Open the exiting layer to squash
-                with tarfile.open(layer_tar_file, 'r') as layer_tar:
+                with tarfile.open(layer_tar_file, 'r', format=tarfile.PAX_FORMAT) as layer_tar:
                     # Find all marker files for all layers
                     markers = self._marker_files(layer_tar, layer_id)
                     tar_files = [o.name for o in layer_tar.getmembers()]
@@ -255,7 +261,7 @@ class Squash:
                             to_skip.append(actual_file)
                             del(unskipped_markers[marker_name])
 
-                    for marker_name, marker in markers.iteritems():
+                    for marker_name, marker in six.iteritems(markers):
                         actual_file = marker_name.replace('.wh.', '')
                         to_skip.append(marker_name)
 
@@ -305,7 +311,7 @@ class Squash:
             # still some marker files - we need to add them back because these
             # remove (technically: hide) files from layers unaffected
             # by squashing
-            for marker_name, marker in unskipped_markers.iteritems():
+            for marker_name, marker in six.iteritems(unskipped_markers):
                 self.log.debug(
                     "Adding '%s' marker file back since the file it refers to was not found in any layers we squashed..." % marker_name)
                 squashed_tar.addfile(marker['info'], marker['file'])

@@ -33,9 +33,6 @@ class CLI:
         layers.Layers(log=self.log, image=args.image,
                       dockerfile=args.dockerfile, tags=args.tags, machine=args.machine, commands=args.commands).run()
 
-    def _init_docker():
-        pass
-
     def run(self):
         parser = MyParser(
             description='Set of helpers scripts fo Docker')

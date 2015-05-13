@@ -381,58 +381,59 @@ class Squash:
         # Prepare temporary directory where all the work will be executed
         tmp_dir = self._prepare_tmp_directory(self.tmp_dir)
 
-        # Location of the tar with the old image
-        old_image_tar = os.path.join(tmp_dir, "image.tar")
+        try:
+            # Location of the tar with the old image
+            old_image_tar = os.path.join(tmp_dir, "image.tar")
+    
+            # Save the image in tar format in the tepmorary directory
+            if not self._save_image(old_image_id, old_image_tar):
+                sys.exit(1)
+    
+            # Directory where the old layers will be unpacked
+            old_image_dir = os.path.join(tmp_dir, "old")
+            os.makedirs(old_image_dir)
+    
+            # Unpack the image
+            self._unpack(old_image_tar, old_image_dir)
+    
+            # Directory where the new layers will be unpacked in prepareation to
+            # import it to Docker
+            new_image_dir = os.path.join(tmp_dir, "new")
+            os.makedirs(new_image_dir)
+    
+            # Generate a new image id for the squashed layer
+            new_image_id = self._generate_image_id()
+    
+            self.log.info(
+                "New layer ID for squashed content will be: %s" % new_image_id)
+    
+            # Prepare a directory for squashed layer content
+            squashed_dir = os.path.join(new_image_dir, new_image_id)
+            os.makedirs(squashed_dir)
+    
+            # Location of the tar archive with the squashed layers
+            squashed_tar = os.path.join(squashed_dir, "layer.tar")
+    
+            # Append all the layers on each other
+            self._squash_layers(layers_to_squash, squashed_tar, old_image_dir)
+    
+            # Move all the layers that should be untouched
+            self._move_unmodified_layers(
+                old_layers, squash_id, old_image_dir, new_image_dir)
+    
+            # Generate the metadata JSON based on the original one
+            self._generate_target_json(
+                old_image_id, new_image_id, squash_id, squashed_dir)
+    
+            # Generate the metadata JSON with information about the images
+            self._generate_repositories_json(
+                os.path.join(new_image_dir, "repositories"), new_image_id, image_name, image_tag)
+    
+            # And finally tar everything up and load into Docker
+            self._load_image(new_image_dir)
 
-        # Save the image in tar format in the tepmorary directory
-        if not self._save_image(old_image_id, old_image_tar):
-            sys.exit(1)
-
-        # Directory where the old layers will be unpacked
-        old_image_dir = os.path.join(tmp_dir, "old")
-        os.makedirs(old_image_dir)
-
-        # Unpack the image
-        self._unpack(old_image_tar, old_image_dir)
-
-        # Directory where the new layers will be unpacked in prepareation to
-        # import it to Docker
-        new_image_dir = os.path.join(tmp_dir, "new")
-        os.makedirs(new_image_dir)
-
-        # Generate a new image id for the squashed layer
-        new_image_id = self._generate_image_id()
-
-        self.log.info(
-            "New layer ID for squashed content will be: %s" % new_image_id)
-
-        # Prepare a directory for squashed layer content
-        squashed_dir = os.path.join(new_image_dir, new_image_id)
-        os.makedirs(squashed_dir)
-
-        # Location of the tar archive with the squashed layers
-        squashed_tar = os.path.join(squashed_dir, "layer.tar")
-
-        # Append all the layers on each other
-        self._squash_layers(layers_to_squash, squashed_tar, old_image_dir)
-
-        # Move all the layers that should be untouched
-        self._move_unmodified_layers(
-            old_layers, squash_id, old_image_dir, new_image_dir)
-
-        # Generate the metadata JSON based on the original one
-        self._generate_target_json(
-            old_image_id, new_image_id, squash_id, squashed_dir)
-
-        # Generate the metadata JSON with information about the images
-        self._generate_repositories_json(
-            os.path.join(new_image_dir, "repositories"), new_image_id, image_name, image_tag)
-
-        # And finally tar everything up and load into Docker
-        self._load_image(new_image_dir)
-
-        # Cleanup the temporary directory
-        shutil.rmtree(tmp_dir)
-
-        self.log.info("Finished, image registered as '%s:%s'" %
-                      (image_name, image_tag))
+            self.log.info("Finished, image registered as '%s:%s'" %
+                          (image_name, image_tag))
+        finally:
+            # Cleanup the temporary directory
+            shutil.rmtree(tmp_dir)

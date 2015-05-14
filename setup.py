@@ -1,17 +1,16 @@
 #!/usr/bin/python
 
 from setuptools import setup, find_packages
+from docker_scripts import version
 
 import codecs
-
-version = "0.3.4"
 
 with open('requirements.txt') as f:
     requirements = f.read().splitlines()
 
 setup(
     name = "docker-scripts",
-    version = version,
+    version = version.version,
     packages = find_packages(),
     url = 'https://github.com/goldmann/docker-scripts',
     download_url = "https://github.com/goldmann/docker-scripts/archive/%s.tar.gz" % version,

@@ -19,7 +19,7 @@ from six.moves import cStringIO
 
 from .lib import common
 
-if six.PY2:
+if not six.PY3:
     import lib.xtarfile
 
 

@@ -13,7 +13,7 @@ setup(
     version = version.version,
     packages = find_packages(),
     url = 'https://github.com/goldmann/docker-scripts',
-    download_url = "https://github.com/goldmann/docker-scripts/archive/%s.tar.gz" % version,
+    download_url = "https://github.com/goldmann/docker-scripts/archive/%s.tar.gz" % version.version,
     author = 'Marek Goldmann',
     author_email = 'marek.goldmann@gmail.com',
     description = 'A swiss-knife tool that could be useful for people working with Docker',

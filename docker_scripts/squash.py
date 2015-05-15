@@ -361,7 +361,7 @@ class Squash:
 
         if not squash_id in old_layers:
             self.log.error("Couldn't find the provided layer (%s) in the %s image" % (
-                self.layer, self.image))
+                self.from_layer, self.image))
             sys.exit(1)
 
         # Find the layers to squash

@@ -436,3 +436,5 @@ class Squash:
 
         self.log.info("Finished, image registered as '%s:%s'" %
                       (image_name, image_tag))
+
+        return new_image_id

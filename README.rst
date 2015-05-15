@@ -1,6 +1,9 @@
 ``docker-scripts``
 ==================
 
+.. image:: https://travis-ci.org/goldmann/docker-scripts.svg?branch=master
+    :target: https://travis-ci.org/goldmann/docker-scripts
+
 A swiss-knife tool that could be useful for people working with Docker.
 
 Features

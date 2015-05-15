@@ -6,5 +6,5 @@ python:
 install: "pip install -r requirements.txt"
 script:
   - "python setup.py build"
-  - "python -m compileall -f ."
+  - "python -m compileall -f build"
   - "python setup.py test"

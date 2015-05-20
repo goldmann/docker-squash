@@ -63,7 +63,7 @@ class Squash:
     def _save_image(self, image_id, tar_file):
         """ Saves the image as a tar archive under specified name """
 
-        for x in six.moves.range(3):
+        for x in [0, 1, 2]:
             self.log.info("Saving image %s to %s file..." %
                           (image_id, tar_file))
             self.log.debug("Try #%s..." % (x + 1))

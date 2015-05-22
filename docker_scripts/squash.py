@@ -131,10 +131,6 @@ class Squash:
                 self.log.debug("Found '%s' marker file" % member.name)
                 marker_files[member.name] = member
 
-        if marker_files:
-            self.log.debug("Following files are marked to skip in the %s layer: %s" % (
-                layer_id, " ".join(marker_files.keys())))
-
         return marker_files
 
     def _generate_target_json(self, old_image_id, new_image_id, squash_id, squashed_dir):
@@ -217,7 +213,7 @@ class Squash:
             os.makedirs(provided_tmp_dir)
             return provided_tmp_dir
         else:
-            return tempfile.mkdtemp(prefix="tmp-docker-squash-")
+            return tempfile.mkdtemp(prefix="docker-squash-")
 
     def _parse_image_name(self, image):
         if ':' in image and not '/' in image.split(':')[-1]:
@@ -229,6 +225,13 @@ class Squash:
 
         return (image_name, image_tag)
 
+    def _file_should_be_skipped(self, file_name, skipped_paths):
+        for file_path in skipped_paths:
+            if file_name.startswith(file_path):
+                return True
+
+        return False
+
     def _squash_layers(self, layers_to_squash, squashed_tar_file, old_image_dir):
         # Reverse the layers to squash - we begin with the newest one
         # to make the tar lighter
@@ -237,7 +240,8 @@ class Squash:
         self.log.info("Starting squashing...")
 
         with tarfile.open(squashed_tar_file, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
-            unskipped_markers = {}
+            markers_to_add = {}
+            to_skip = []
 
             for layer_id in layers_to_squash:
                 layer_tar_file = os.path.join(
@@ -250,42 +254,36 @@ class Squash:
                     # Find all marker files for all layers
                     markers = self._marker_files(layer_tar, layer_id)
                     tar_files = [o.name for o in layer_tar.getmembers()]
+                    squashed_files = [o.name for o in squashed_tar.getmembers()]
 
-                    to_skip = []
-
-                    for marker_name in unskipped_markers.keys():
-                        actual_file = marker_name.replace('.wh.', '')
-
-                        if actual_file in tar_files:
-                            to_skip.append(marker_name)
-                            to_skip.append(actual_file)
-                            del(unskipped_markers[marker_name])
-
+                    # Iterate over the marker files found for this particular layer
                     for marker_name, marker in six.iteritems(markers):
                         actual_file = marker_name.replace('.wh.', '')
+                        # Add all files (marekr or not) to skipped files
                         to_skip.append(marker_name)
+                        to_skip.append(actual_file)
 
-                        if actual_file in tar_files:
-                            to_skip.append(actual_file)
-                        else:
+                        # TODO: what with directories?
+                        if actual_file not in squashed_files:
+                            # If the file is not available in the already squashed
+                            # tar, then add id to the list. We'll add the marker file
+                            # later to the image, to be sure the file is hidden.
+                            # This may create unnecessary marker files, but we don't need
+                            # to check layers we do not squash for the file existence.
+                            #
                             # We can safely add the file content, because marker
                             # files are empty
-                            unskipped_markers[marker_name] = {
-                                'file': layer_tar.extractfile(marker), 'info': marker}
-
-                    if to_skip:
-                        self.log.debug("Following files are marked to skip when squashing layer %s: %s" % (
-                            layer_id, to_skip))
+                            markers_to_add[marker] = layer_tar.extractfile(marker)
 
                     # Copy all the files to the new tar
                     for member in layer_tar.getmembers():
                         # Skip files that are marked to be skipped
-                        if member.name in to_skip:
-                            self.log.debug(
-                                "Skipping '%s' file because it's on the list to skip files" % member.name)
+                        if self._file_should_be_skipped(member.name, to_skip):
+                            self.log.debug("Skipping '%s' file because it's on the list to skip files" % member.name)
                             continue
 
                         # List of filenames in the squashed archive
+                        # TODO: optimize this
                         squashed_files = [
                             o.name for o in squashed_tar.getmembers()]
 
@@ -311,10 +309,10 @@ class Squash:
             # still some marker files - we need to add them back because these
             # remove (technically: hide) files from layers unaffected
             # by squashing
-            for marker_name, marker in six.iteritems(unskipped_markers):
+            for marker, marker_file in six.iteritems(markers_to_add):
                 self.log.debug(
-                    "Adding '%s' marker file back since the file it refers to was not found in any layers we squashed..." % marker_name)
-                squashed_tar.addfile(marker['info'], marker['file'])
+                    "Adding '%s' marker file back..." % marker.name)
+                squashed_tar.addfile(marker, marker_file)
 
         self.log.debug("Squashing done!")
 

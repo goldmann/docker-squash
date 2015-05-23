@@ -1,14 +1,16 @@
 import unittest
 import logging
+import mock
 from docker_scripts.squash import Squash
 
 
 class TestSkippingFiles(unittest.TestCase):
 
     def setUp(self):
+        self.docker_client = mock.Mock()
         self.log = logger = logging.getLogger(__name__)
         self.image = "wahtever"
-        self.squash = Squash(self.log, self.image)
+        self.squash = Squash(self.log, self.image, self.docker_client)
 
     def test_should_skip_exact_files(self):
         ret = self.squash._file_should_be_skipped(

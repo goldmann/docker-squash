@@ -1,5 +1,7 @@
 import unittest
 import mock
+import six
+
 from docker_scripts.squash import Squash
 
 
@@ -125,6 +127,23 @@ class TestGenerateImageId(unittest.TestCase):
         image_id = self.squash._generate_image_id()
         self.assertEquals(mock_random.call_count, 2)
         self.assertEquals(len(image_id), 64)
+
+
+class TestGenerateRepositoriesJSON(unittest.TestCase):
+
+    def setUp(self):
+        self.docker_client = mock.Mock()
+        self.log = mock.Mock()
+        self.image = "whatever"
+        self.squash = Squash(self.log, self.image, self.docker_client)
+
+    def test_generate_json(self):
+        image_id = '12323dferwt4awefq23rasf'
+        with mock.patch.object(six.moves.builtins, 'open', mock.mock_open()) as mock_file:
+            self.squash._generate_repositories_json(
+                'file', image_id, 'name', 'tag')
+            mock_file().write.assert_called_once_with(
+                '{"name": {"tag": "12323dferwt4awefq23rasf"}}')
 
 if __name__ == '__main__':
     unittest.main()

@@ -160,8 +160,10 @@ class Squash:
         repos[name] = {}
         repos[name][tag] = new_image_id
 
+        data = json.dumps(repos)
+
         with open(repositories_file, 'w') as f:
-            json.dump(repos, f)
+            f.write(data)
 
     def _generate_image_id(self):
         while True:

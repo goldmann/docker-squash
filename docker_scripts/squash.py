@@ -207,9 +207,7 @@ class Squash:
         """ Creates temporary directory that is used to work on layers """
         if provided_tmp_dir:
             if os.path.exists(provided_tmp_dir):
-                self.log.error(
-                    "The '%s' directory already exists, please remove it before you proceed, aborting." % provided_tmp_dir)
-                sys.exit(1)
+                return None
             os.makedirs(provided_tmp_dir)
             return provided_tmp_dir
         else:
@@ -254,9 +252,11 @@ class Squash:
                     # Find all marker files for all layers
                     markers = self._marker_files(layer_tar, layer_id)
                     tar_files = [o.name for o in layer_tar.getmembers()]
-                    squashed_files = [o.name for o in squashed_tar.getmembers()]
+                    squashed_files = [
+                        o.name for o in squashed_tar.getmembers()]
 
-                    # Iterate over the marker files found for this particular layer
+                    # Iterate over the marker files found for this particular
+                    # layer
                     for marker_name, marker in six.iteritems(markers):
                         actual_file = marker_name.replace('.wh.', '')
                         # Add all files (marekr or not) to skipped files
@@ -273,13 +273,15 @@ class Squash:
                             #
                             # We can safely add the file content, because marker
                             # files are empty
-                            markers_to_add[marker] = layer_tar.extractfile(marker)
+                            markers_to_add[
+                                marker] = layer_tar.extractfile(marker)
 
                     # Copy all the files to the new tar
                     for member in layer_tar.getmembers():
                         # Skip files that are marked to be skipped
                         if self._file_should_be_skipped(member.name, to_skip):
-                            self.log.debug("Skipping '%s' file because it's on the list to skip files" % member.name)
+                            self.log.debug(
+                                "Skipping '%s' file because it's on the list to skip files" % member.name)
                             continue
 
                         # List of filenames in the squashed archive
@@ -378,6 +380,11 @@ class Squash:
 
         # Prepare temporary directory where all the work will be executed
         tmp_dir = self._prepare_tmp_directory(self.tmp_dir)
+
+        if not tmp_dir:
+            self.log.error(
+                "The '%s' directory already exists, please remove it before you proceed, aborting." % provided_tmp_dir)
+            sys.exit(1)
 
         # Location of the tar with the old image
         old_image_tar = os.path.join(tmp_dir, "image.tar")

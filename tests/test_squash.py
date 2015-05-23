@@ -41,12 +41,17 @@ class TestParseImageName(unittest.TestCase):
         self.squash = Squash(self.log, self.image, self.docker_client)
 
     def test_should_parse_name_name_with_proper_tag(self):
-        self.assertEqual(self.squash._parse_image_name('jboss/wildfly:abc'), ('jboss/wildfly', 'abc'))
-        self.assertEqual(self.squash._parse_image_name('jboss:abc'), ('jboss', 'abc'))
+        self.assertEqual(self.squash._parse_image_name(
+            'jboss/wildfly:abc'), ('jboss/wildfly', 'abc'))
+        self.assertEqual(
+            self.squash._parse_image_name('jboss:abc'), ('jboss', 'abc'))
 
     def test_should_parse_name_name_without_tag(self):
-        self.assertEqual(self.squash._parse_image_name('jboss/wildfly'), ('jboss/wildfly', 'latest'))
-        self.assertEqual(self.squash._parse_image_name('jboss'), ('jboss', 'latest'))
+        self.assertEqual(self.squash._parse_image_name(
+            'jboss/wildfly'), ('jboss/wildfly', 'latest'))
+        self.assertEqual(
+            self.squash._parse_image_name('jboss'), ('jboss', 'latest'))
+
 
 class TestPrepareTemporaryDirectory(unittest.TestCase):
 
@@ -73,6 +78,53 @@ class TestPrepareTemporaryDirectory(unittest.TestCase):
         mock_path.assert_called_with('tmp')
         mock_makedirs.assert_called_with('tmp')
 
+
+class TestPrepareLayersToSquash(unittest.TestCase):
+
+    def setUp(self):
+        self.docker_client = mock.Mock()
+        self.log = mock.Mock()
+        self.image = "whatever"
+        self.squash = Squash(self.log, self.image, self.docker_client)
+
+    # The order is from oldest to newest
+    def test_should_generate_list_of_layers(self):
+        self.assertEquals(self.squash._layers_to_squash(
+            ['abc', 'def', 'ghi', 'jkl'], 'def'), ['ghi', 'jkl'])
+
+    def test_should_not_fail_with_empty_list_of_layers(self):
+        self.assertEquals(self.squash._layers_to_squash([], 'def'), [])
+
+    def test_should_return_all_layers_if_from_layer_is_not_found(self):
+        self.assertEquals(self.squash._layers_to_squash(
+            ['abc', 'def', 'ghi', 'jkl'], 'asdasdasd'), ['abc', 'def', 'ghi', 'jkl'])
+
+
+class TestGenerateImageId(unittest.TestCase):
+
+    def setUp(self):
+        self.docker_client = mock.Mock()
+        self.log = mock.Mock()
+        self.image = "whatever"
+        self.squash = Squash(self.log, self.image, self.docker_client)
+
+    def test_should_generate_id(self):
+        image_id = self.squash._generate_image_id()
+        self.assertEquals(len(image_id), 64)
+        self.assertEquals(isinstance(image_id, str), True)
+
+    @mock.patch('docker_scripts.squash.hashlib.sha256')
+    def test_should_generate_id_that_is_not_integer_shen_shortened(self, mock_random):
+        first_pass = mock.Mock()
+        first_pass.hexdigest.return_value = '12683859385754f68e0652f13eb771725feff397144cd60886cb5f9800ed3e22'
+
+        second_pass = mock.Mock()
+        second_pass.hexdigest.return_value = '10aaeb89980554f68e0652f13eb771725feff397144cd60886cb5f9800ed3e22'
+
+        mock_random.side_effect = [first_pass, second_pass]
+        image_id = self.squash._generate_image_id()
+        self.assertEquals(mock_random.call_count, 2)
+        self.assertEquals(len(image_id), 64)
+
 if __name__ == '__main__':
     unittest.main()
-

@@ -145,5 +145,15 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
             mock_file().write.assert_called_once_with(
                 '{"name": {"tag": "12323dferwt4awefq23rasf"}}')
 
+    def test_handle_empty_image_id(self):
+        with mock.patch.object(six.moves.builtins, 'open', mock.mock_open()) as mock_file:
+            with self.assertRaises(Exception) as cm:
+                self.squash._generate_repositories_json(
+                    'file', None, 'name', 'tag')
+
+            self.assertEquals(
+                cm.exception.message, 'Provided image id cannot be null')
+            mock_file().write.assert_not_called()
+
 if __name__ == '__main__':
     unittest.main()

@@ -155,10 +155,13 @@ class Squash:
         with open(json_file, 'w') as f:
             json.dump(metadata, f)
 
-    def _generate_repositories_json(self, repositories_file, new_image_id, name, tag):
+    def _generate_repositories_json(self, repositories_file, image_id, name, tag):
+        if not image_id:
+            raise Exception("Provided image id cannot be null")
+
         repos = {}
         repos[name] = {}
-        repos[name][tag] = new_image_id
+        repos[name][tag] = image_id
 
         data = json.dumps(repos)
 

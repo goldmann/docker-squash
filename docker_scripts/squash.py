@@ -227,7 +227,7 @@ class Squash:
 
     def _file_should_be_skipped(self, file_name, skipped_paths):
         for file_path in skipped_paths:
-            if file_name.startswith(file_path):
+            if file_name == file_path or file_name.startswith(file_path + "/"):
                 return True
 
         return False

@@ -155,5 +155,52 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
                 str(cm.exception), 'Provided image id cannot be null')
             mock_file().write.assert_not_called()
 
+
+class TestMarkerFiles(unittest.TestCase):
+
+    def setUp(self):
+        self.docker_client = mock.Mock()
+        self.log = mock.Mock()
+        self.image = "whatever"
+        self.squash = Squash(self.log, self.image, self.docker_client)
+
+    def _tar_member(self, ret_val):
+        member = mock.Mock()
+        member.name = ret_val
+        return member
+
+    def test_should_find_all_marker_files(self):
+        files = []
+
+        for path in ['/opt/eap', '/opt/eap/one', '/opt/eap/.wh.to_skip']:
+            files.append(self._tar_member(path))
+
+        tar = mock.Mock()
+        tar.getmembers.return_value = files
+        markers = self.squash._marker_files(tar)
+
+        self.assertTrue(len(markers) == 1)
+        member = markers['/opt/eap/.wh.to_skip']
+        self.assertTrue(member is not None)
+
+    def test_should_return_empty_dict_when_no_files_are_in_the_tar(self):
+        tar = mock.Mock()
+        tar.getmembers.return_value = []
+        markers = self.squash._marker_files(tar)
+        self.assertTrue(markers == {})
+
+    def test_should_return_empty_dict_when_no_marker_files_are_found(self):
+        files = []
+
+        for path in ['/opt/eap', '/opt/eap/one']:
+            files.append(self._tar_member(path))
+
+        tar = mock.Mock()
+        tar.getmembers.return_value = files
+        markers = self.squash._marker_files(tar)
+
+        self.assertTrue(len(markers) == 0)
+        self.assertTrue(markers == {})
+
 if __name__ == '__main__':
     unittest.main()

@@ -113,7 +113,7 @@ class Squash:
                 # Stop if we are at the first layer that was squashed
                 return
 
-    def _marker_files(self, tar, layer_id):
+    def _marker_files(self, tar):
         """
         Searches for marker files in the specified archive.
 
@@ -255,7 +255,7 @@ class Squash:
                 # Open the exiting layer to squash
                 with tarfile.open(layer_tar_file, 'r', format=tarfile.PAX_FORMAT) as layer_tar:
                     # Find all marker files for all layers
-                    markers = self._marker_files(layer_tar, layer_id)
+                    markers = self._marker_files(layer_tar)
                     tar_files = [o.name for o in layer_tar.getmembers()]
                     squashed_files = [
                         o.name for o in squashed_tar.getmembers()]

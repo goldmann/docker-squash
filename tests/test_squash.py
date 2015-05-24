@@ -152,7 +152,7 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
                     'file', None, 'name', 'tag')
 
             self.assertEquals(
-                cm.exception.message, 'Provided image id cannot be null')
+                str(cm.exception), 'Provided image id cannot be null')
             mock_file().write.assert_not_called()
 
 if __name__ == '__main__':

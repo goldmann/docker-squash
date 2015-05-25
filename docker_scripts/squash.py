@@ -2,7 +2,6 @@
 
 import sys
 import json
-import argparse
 import tempfile
 import shutil
 import os
@@ -10,12 +9,9 @@ import os
 import random
 import hashlib
 import datetime
-import docker
-import logging
 import tarfile
 
 import six
-from six.moves import cStringIO
 
 from .lib import common
 
@@ -23,7 +19,7 @@ if not six.PY3:
     import lib.xtarfile
 
 
-class Chdir:
+class Chdir(object):
 
     """ Context manager for changing the current working directory """
 
@@ -38,7 +34,7 @@ class Chdir:
         os.chdir(self.savedPath)
 
 
-class Squash:
+class Squash(object):
 
     def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None):
         self.log = log
@@ -257,7 +253,6 @@ class Squash:
                 with tarfile.open(layer_tar_file, 'r', format=tarfile.PAX_FORMAT) as layer_tar:
                     # Find all marker files for all layers
                     markers = self._marker_files(layer_tar)
-                    tar_files = [o.name for o in layer_tar.getmembers()]
                     squashed_files = [
                         o.name for o in squashed_tar.getmembers()]
 

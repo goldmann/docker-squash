@@ -3,7 +3,7 @@
 from .lib import common
 
 
-class Layers:
+class Layers(object):
 
     def __init__(self, log, image, docker=None, commands=False, dockerfile=False, machine=False, tags=False):
         self.log = log

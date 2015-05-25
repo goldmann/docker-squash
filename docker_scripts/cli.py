@@ -15,7 +15,7 @@ class MyParser(argparse.ArgumentParser):
         sys.exit(2)
 
 
-class CLI:
+class CLI(object):
 
     def __init__(self):
         self.log = logging.getLogger()

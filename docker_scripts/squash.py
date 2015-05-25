@@ -36,13 +36,14 @@ class Chdir(object):
 
 class Squash(object):
 
-    def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None):
+    def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None, output_path=None):
         self.log = log
         self.docker = docker
         self.image = image
         self.from_layer = from_layer
         self.tag = tag
         self.tmp_dir = tmp_dir
+        self.output_path = output_path
 
         if not docker:
             self.docker = common.docker_client()
@@ -174,6 +175,13 @@ class Squash(object):
             except ValueError:
                 # All good!
                 return image_id
+
+    def _tar_image(self, output_path, directory):
+        with tarfile.open(output_path, 'w') as tar:
+            self.log.debug("Generating tar archive for the squashed image...")
+            with Chdir(directory):
+                tar.add(".")
+            self.log.debug("Archive generated")
 
     def _load_image(self, directory):
         buf = six.BytesIO()
@@ -433,13 +441,19 @@ class Squash(object):
         self._generate_repositories_json(
             os.path.join(new_image_dir, "repositories"), new_image_id, image_name, image_tag)
 
-        # And finally tar everything up and load into Docker
-        self._load_image(new_image_dir)
+        self.log.info("Squashed image name: %s:%s" % (image_name, image_tag))
+
+        if self.output_path:
+            # Move the tar archive to the specified path and exit
+            # without loading into Docker
+            self._tar_image(self.output_path, new_image_dir)
+            self.log.info("Image available at '%s'" % self.output_path)
+        else:
+            # Load image into Docker
+            self._load_image(new_image_dir)
+            self.log.info("Image registered in Docker daemon")
 
         # Cleanup the temporary directory
         shutil.rmtree(tmp_dir)
-
-        self.log.info("Finished, image registered as '%s:%s'" %
-                      (image_name, image_tag))
 
         return new_image_id

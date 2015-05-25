@@ -27,7 +27,7 @@ class CLI(object):
 
     def run_squash(self, args):
         squash.Squash(log=self.log, image=args.image,
-                      from_layer=args.from_layer, tag=args.tag).run()
+                      from_layer=args.from_layer, tag=args.tag, output_path=args.output_path).run()
 
     def run_layers(self, args):
         layers.Layers(log=self.log, image=args.image,
@@ -56,6 +56,8 @@ class CLI(object):
             '-t', '--tag', help="Specify the tag to be used for the new image. By default it'll be set to 'image' argument")
         parser_squash.add_argument(
             '--tmp-dir', help='Temporary directory to be used')
+        parser_squash.add_argument(
+            '--output-path', help='Path where the image should be stored after squashing. If not provided, image will be loaded into Docker daemon')
 
         # Layers
         parser_layers = subparsers.add_parser(

@@ -11,8 +11,8 @@ import datetime
 import tarfile
 import six
 
-from .lib import common
-from errors import SquashError
+from docker_scripts.lib import common
+from docker_scripts.errors import SquashError
 
 if not six.PY3:
     import lib.xtarfile

@@ -333,7 +333,7 @@ class Squash(object):
         # The image id or name of the image to be squashed
         try:
             old_image_id = self.docker.inspect_image(self.image)['Id']
-        except:
+        except SquashError:
             self.log.error(
                 "Could not get the image ID to squash, please check provided 'image' argument: %s" % self.image)
             sys.exit(1)
@@ -359,7 +359,7 @@ class Squash(object):
 
         try:
             squash_id = self.docker.inspect_image(from_layer)['Id']
-        except:
+        except SquashError:
             self.log.error(
                 "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % from_layer)
             sys.exit(1)

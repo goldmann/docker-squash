@@ -5,15 +5,14 @@ import json
 import tempfile
 import shutil
 import os
-
 import random
 import hashlib
 import datetime
 import tarfile
-
 import six
 
 from .lib import common
+from errors import SquashError
 
 if not six.PY3:
     import lib.xtarfile
@@ -154,7 +153,7 @@ class Squash(object):
 
     def _generate_repositories_json(self, repositories_file, image_id, name, tag):
         if not image_id:
-            raise Exception("Provided image id cannot be null")
+            raise SquashError("Provided image id cannot be null")
 
         repos = {}
         repos[name] = {}
@@ -216,7 +215,7 @@ class Squash(object):
         """ Creates temporary directory that is used to work on layers """
         if provided_tmp_dir:
             if os.path.exists(provided_tmp_dir):
-                raise Exception(
+                raise SquashError(
                     "The '%s' directory already exists, please remove it before you proceed" % provided_tmp_dir)
             os.makedirs(provided_tmp_dir)
             return provided_tmp_dir

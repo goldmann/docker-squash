@@ -3,6 +3,7 @@ import mock
 import six
 
 from docker_scripts.squash import Squash
+from docker_scripts.errors import SquashError
 
 
 class TestSkippingFiles(unittest.TestCase):
@@ -71,7 +72,7 @@ class TestPrepareTemporaryDirectory(unittest.TestCase):
     @mock.patch('docker_scripts.squash.tempfile')
     @mock.patch('docker_scripts.squash.os.path.exists', return_value=True)
     def test_should_raise_if_directory_already_exists(self, mock_path, mock_tempfile):
-        with self.assertRaises(Exception) as cm:
+        with self.assertRaises(SquashError) as cm:
             self.squash._prepare_tmp_directory('tmp')
         self.assertEquals(
             str(cm.exception), "The 'tmp' directory already exists, please remove it before you proceed")
@@ -152,7 +153,7 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
 
     def test_handle_empty_image_id(self):
         with mock.patch.object(six.moves.builtins, 'open', mock.mock_open()) as mock_file:
-            with self.assertRaises(Exception) as cm:
+            with self.assertRaises(SquashError) as cm:
                 self.squash._generate_repositories_json(
                     'file', None, 'name', 'tag')
 

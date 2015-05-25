@@ -212,7 +212,8 @@ class Squash:
         """ Creates temporary directory that is used to work on layers """
         if provided_tmp_dir:
             if os.path.exists(provided_tmp_dir):
-                return None
+                raise Exception(
+                    "The '%s' directory already exists, please remove it before you proceed" % provided_tmp_dir)
             os.makedirs(provided_tmp_dir)
             return provided_tmp_dir
         else:
@@ -384,11 +385,10 @@ class Squash:
         self.log.debug("Layers to squash: %s", layers_to_squash)
 
         # Prepare temporary directory where all the work will be executed
-        tmp_dir = self._prepare_tmp_directory(self.tmp_dir)
-
-        if not tmp_dir:
-            self.log.error(
-                "The '%s' directory already exists, please remove it before you proceed, aborting." % tmp_dir)
+        try:
+            tmp_dir = self._prepare_tmp_directory(self.tmp_dir)
+        except:
+            self.log.error("Preparing temporary directory failed, aborting")
             sys.exit(1)
 
         # Location of the tar with the old image

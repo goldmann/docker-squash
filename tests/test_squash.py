@@ -68,10 +68,15 @@ class TestPrepareTemporaryDirectory(unittest.TestCase):
         self.squash._prepare_tmp_directory(None)
         mock_tempfile.mkdtemp.assert_called_with(prefix="docker-squash-")
 
+    @mock.patch('docker_scripts.squash.tempfile')
     @mock.patch('docker_scripts.squash.os.path.exists', return_value=True)
-    def test_should_return_none_if_directory_already_exists(self, mock_path):
-        self.assertEqual(self.squash._prepare_tmp_directory('tmp'), None)
+    def test_should_raise_if_directory_already_exists(self, mock_path, mock_tempfile):
+        with self.assertRaises(Exception) as cm:
+            self.squash._prepare_tmp_directory('tmp')
+        self.assertEquals(
+            str(cm.exception), "The 'tmp' directory already exists, please remove it before you proceed")
         mock_path.assert_called_with('tmp')
+        self.assertTrue(len(mock_tempfile.mkdtemp.mock_calls) == 0)
 
     @mock.patch('docker_scripts.squash.os.path.exists', return_value=False)
     @mock.patch('docker_scripts.squash.os.makedirs', return_value=False)

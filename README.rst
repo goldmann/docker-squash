@@ -4,6 +4,10 @@
 .. image:: https://travis-ci.org/goldmann/docker-scripts.svg?branch=master
     :target: https://travis-ci.org/goldmann/docker-scripts
 
+.. image:: https://landscape.io/github/goldmann/docker-scripts/master/landscape.svg?style=flat
+   :target: https://landscape.io/github/goldmann/docker-scripts/master
+      :alt: Code Health
+
 A swiss-knife tool that could be useful for people working with Docker.
 
 Features

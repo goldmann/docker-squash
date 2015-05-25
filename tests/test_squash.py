@@ -98,14 +98,14 @@ class TestPrepareLayersToSquash(unittest.TestCase):
     # The order is from oldest to newest
     def test_should_generate_list_of_layers(self):
         self.assertEquals(self.squash._layers_to_squash(
-            ['abc', 'def', 'ghi', 'jkl'], 'def'), ['ghi', 'jkl'])
+            ['abc', 'def', 'ghi', 'jkl'], 'def'), (['ghi', 'jkl'], ['abc', 'def']))
 
     def test_should_not_fail_with_empty_list_of_layers(self):
-        self.assertEquals(self.squash._layers_to_squash([], 'def'), [])
+        self.assertEquals(self.squash._layers_to_squash([], 'def'), ([], []))
 
     def test_should_return_all_layers_if_from_layer_is_not_found(self):
         self.assertEquals(self.squash._layers_to_squash(
-            ['abc', 'def', 'ghi', 'jkl'], 'asdasdasd'), ['abc', 'def', 'ghi', 'jkl'])
+            ['abc', 'def', 'ghi', 'jkl'], 'asdasdasd'), (['abc', 'def', 'ghi', 'jkl'], []))
 
 
 class TestGenerateImageId(unittest.TestCase):

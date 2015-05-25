@@ -11,7 +11,7 @@ with open('requirements.txt') as f:
 setup(
     name = "docker-scripts",
     version = version.version,
-    packages = find_packages(),
+    packages = find_packages(exclude=["tests"]),
     url = 'https://github.com/goldmann/docker-scripts',
     download_url = "https://github.com/goldmann/docker-scripts/archive/%s.tar.gz" % version.version,
     author = 'Marek Goldmann',

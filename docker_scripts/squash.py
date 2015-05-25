@@ -388,7 +388,7 @@ class Squash:
 
         if not tmp_dir:
             self.log.error(
-                "The '%s' directory already exists, please remove it before you proceed, aborting." % provided_tmp_dir)
+                "The '%s' directory already exists, please remove it before you proceed, aborting." % tmp_dir)
             sys.exit(1)
 
         # Location of the tar with the old image

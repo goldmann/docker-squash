@@ -23,5 +23,6 @@ setup(
     entry_points = {
         'console_scripts': ['docker-scripts=docker_scripts.cli:run'],
     },
+    tests_require = ['mock'],
     install_requires=requirements
 )

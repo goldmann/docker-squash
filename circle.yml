@@ -1,0 +1,17 @@
+machine:
+  python:
+  services:
+    - docker
+  environment:
+    CI: true
+
+dependencies:
+  pre:
+    - pip install mock
+  post:
+    - docker version
+    - docker info
+
+test:
+  override:
+    - tox

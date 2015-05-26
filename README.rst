@@ -1,8 +1,8 @@
 ``docker-scripts``
 ==================
 
-.. image:: https://travis-ci.org/goldmann/docker-scripts.svg?branch=master
-    :target: https://travis-ci.org/goldmann/docker-scripts
+.. image:: https://circleci.com/gh/goldmann/docker-scripts.svg?style=svg
+    :target: https://circleci.com/gh/goldmann/docker-scripts
 
 .. image:: https://landscape.io/github/goldmann/docker-scripts/master/landscape.svg?style=flat
    :target: https://landscape.io/github/goldmann/docker-scripts/master

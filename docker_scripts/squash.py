@@ -263,8 +263,6 @@ class Squash(object):
         # Reverse the layers to squash - we begin with the newest one
         # to make the tar lighter
         layers_to_squash.reverse()
-        # Find all files in layers that we don't squash
-        files_in_layers = self._files_in_layers(layers_to_move, old_image_dir)
 
         with tarfile.open(squashed_tar_file, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
             to_skip = []
@@ -283,7 +281,7 @@ class Squash(object):
 
                     # Iterate over the marker files found for this particular
                     # layer
-                    for marker_name, marker in six.iteritems(markers):
+                    for marker_name in markers.keys():
                         actual_file = marker_name.replace('.wh.', '')
                         if self._file_should_be_skipped(actual_file, squashed_files):
                             # Add all files (marker and actual) to skipped files

@@ -16,18 +16,21 @@ from docker_scripts.errors import SquashError
 if not six.PY3:
     import docker_scripts.lib.xtarfile
 
+
 class TestIntegMarkerFiles(unittest.TestCase):
 
     docker = docker.Client(version='1.16')
 
     log = logging.getLogger()
     handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+    formatter = logging.Formatter(
+        '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
     handler.setFormatter(formatter)
     log.addHandler(handler)
     log.setLevel(logging.DEBUG)
 
     class Image(object):
+
         def __init__(self, dockerfile, tag="integ:latest"):
             self.dockerfile = dockerfile
             self.tag = tag
@@ -51,6 +54,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 self.docker.remove_image(image=self.tag, force=True)
 
     class SquashedImage(object):
+
         def __init__(self, image, number_of_layers, tag):
             self.image = image
             self.tag = tag
@@ -59,9 +63,11 @@ class TestIntegMarkerFiles(unittest.TestCase):
             self.log = TestIntegMarkerFiles.log
 
         def __enter__(self):
-            from_layer = self.docker.history(self.image)[self.number_of_layers]['Id']
+            from_layer = self.docker.history(
+                self.image)[self.number_of_layers]['Id']
 
-            squash = Squash(self.log, self.image, self.docker, tag=self.tag, from_layer=from_layer)
+            squash = Squash(
+                self.log, self.image, self.docker, tag=self.tag, from_layer=from_layer)
             squash.run()
             self.squashed_layer = self._squashed_layer()
             self.layers = [o['Id'] for o in self.docker.history(self.tag)]
@@ -76,7 +82,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
 
             buf = io.BytesIO()
             buf.write(image.data)
-            buf.seek(0) # Rewind
+            buf.seek(0)  # Rewind
 
             return buf
 
@@ -92,14 +98,16 @@ class TestIntegMarkerFiles(unittest.TestCase):
             return self._extract_file(image_id + '/layer.tar', image)
 
         def assertFileExists(self, name):
-            self.squashed_layer.seek(0) # Rewind
+            self.squashed_layer.seek(0)  # Rewind
             with tarfile.open(fileobj=self.squashed_layer, mode='r') as tar:
-                assert name in tar.getnames(), "File '%s' was not found in the squashed files: %s" % (name, tar.getnames())
+                assert name in tar.getnames(
+                ), "File '%s' was not found in the squashed files: %s" % (name, tar.getnames())
 
         def assertFileDoesNotExist(self, name):
-            self.squashed_layer.seek(0) # Rewind
+            self.squashed_layer.seek(0)  # Rewind
             with tarfile.open(fileobj=self.squashed_layer, mode='r') as tar:
-                assert name not in tar.getnames(), "File '%s' was found in the squashed layer files: %s" % (name, tar.getnames())
+                assert name not in tar.getnames(
+                ), "File '%s' was found in the squashed layer files: %s" % (name, tar.getnames())
 
     class Container(object):
 
@@ -119,14 +127,16 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 self.docker.remove_container(self.container, force=True)
 
         def assertFileExists(self, name):
-            self.content.seek(0) # Rewind
+            self.content.seek(0)  # Rewind
             with tarfile.open(fileobj=self.content, mode='r') as tar:
-                assert name in tar.getnames(), "File %s was not found in the container files: %s" % (name, tar.getnames())
+                assert name in tar.getnames(
+                ), "File %s was not found in the container files: %s" % (name, tar.getnames())
 
         def assertFileDoesNotExist(self, name):
-            self.content.seek(0) # Rewind
+            self.content.seek(0)  # Rewind
             with tarfile.open(fileobj=self.content, mode='r') as tar:
-                assert name not in tar.getnames(), "File %s was found in the container files: %s" % (name, tar.getnames())
+                assert name not in tar.getnames(
+                ), "File %s was found in the container files: %s" % (name, tar.getnames())
 
     def setUp(self):
         self.tag = "integ:squashed"
@@ -156,10 +166,10 @@ class TestIntegMarkerFiles(unittest.TestCase):
                     container.assertFileExists('somefile_layer1')
                     container.assertFileExists('somefile_layer2')
                     container.assertFileExists('somefile_layer3')
- 
-                    # We should have two layers less in the image
-                    self.assertTrue(len(squashed_image.layers) == len(image.layers) - 2)
 
+                    # We should have two layers less in the image
+                    self.assertTrue(
+                        len(squashed_image.layers) == len(image.layers) - 2)
 
     def test_only_files_from_squashed_image_should_be_in_squashed_layer(self):
         """
@@ -188,9 +198,10 @@ class TestIntegMarkerFiles(unittest.TestCase):
                     container.assertFileExists('somefile_layer1')
                     container.assertFileExists('somefile_layer2')
                     container.assertFileExists('somefile_layer3')
- 
+
                     # We should have two layers less in the image
-                    self.assertEqual(len(squashed_image.layers), len(image.layers) - 1)
+                    self.assertEqual(
+                        len(squashed_image.layers), len(image.layers) - 1)
 
     def test_there_should_be_a_marker_file_in_the_squashed_layer(self):
         """
@@ -215,9 +226,10 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 with self.Container(self.tag) as container:
                     container.assertFileExists('somefile_layer3')
                     container.assertFileDoesNotExist('somefile_layer1')
- 
+
                     # We should have one layer less in the image
-                    self.assertEqual(len(squashed_image.layers), len(image.layers) - 1)
+                    self.assertEqual(
+                        len(squashed_image.layers), len(image.layers) - 1)
 
 if __name__ == '__main__':
     unittest.main()

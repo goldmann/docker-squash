@@ -267,7 +267,6 @@ class Squash(object):
         files_in_layers = self._files_in_layers(layers_to_move, old_image_dir)
 
         with tarfile.open(squashed_tar_file, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
-            markers_to_add = {}
             to_skip = []
 
             for layer_id in layers_to_squash:
@@ -282,30 +281,14 @@ class Squash(object):
                     markers = self._marker_files(layer_tar)
                     squashed_files = squashed_tar.getnames()
 
-                    # Check if the previously skipped marker files can be removed,
-                    # because maybe a file was added later on this path
-                    for marker in markers_to_add.keys():
-                        actual_file = marker.name.replace('.wh.', '')
-                        if self._file_should_be_skipped(actual_file, squashed_files):
-                            del markers_to_add[marker]
-
                     # Iterate over the marker files found for this particular
                     # layer
                     for marker_name, marker in six.iteritems(markers):
                         actual_file = marker_name.replace('.wh.', '')
-                        # Add all files (marker and actual) to skipped files
-                        to_skip.append(marker_name)
-                        to_skip.append(actual_file)
-
-                        if not self._file_should_be_skipped(actual_file, squashed_files):
-                            # If the file is not available in the already squashed
-                            # tar, then add id to the list. We'll (possibly) add the marker file
-                            # later to the image, to be sure the file is hidden.
-                            #
-                            # We can safely add the file content, because marker
-                            # files are empty
-                            markers_to_add[
-                                marker] = layer_tar.extractfile(marker)
+                        if self._file_should_be_skipped(actual_file, squashed_files):
+                            # Add all files (marker and actual) to skipped files
+                            to_skip.append(marker_name)
+                            to_skip.append(actual_file)
 
                     # Copy all the files to the new tar
                     for member in layer_tar.getmembers():
@@ -316,7 +299,6 @@ class Squash(object):
                             continue
 
                         # List of filenames in the squashed archive
-                        # TODO: optimize this
                         squashed_files = squashed_tar.getnames()
 
                         # Check if file is already added to the archive
@@ -337,26 +319,6 @@ class Squash(object):
                             squashed_tar.addfile(
                                 member, layer_tar.extractfile(member))
 
-
-            # We copied all the files from all layers, but if there are
-            # still some marker files - we need to add them back because these
-            # remove (technically: hide) files from layers unaffected
-            # by squashing.
-            #
-            # We only add these marker files back which hide some content from
-            # the layers that we don't squash.
-            for marker, marker_file in six.iteritems(markers_to_add):
-                actual_file = marker.name.replace('.wh.', '')
-                found = False
-
-                for f in files_in_layers.keys():
-                    if self._file_should_be_skipped(actual_file, f):
-                        found = True
-
-                if found:
-                    self.log.debug(
-                        "Adding '%s' marker file back..." % marker.name)
-                    squashed_tar.addfile(marker, marker_file)
 
         self.log.info("Squashing finished!")
 

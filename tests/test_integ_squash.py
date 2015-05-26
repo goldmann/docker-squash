@@ -231,5 +231,68 @@ class TestIntegMarkerFiles(unittest.TestCase):
                     self.assertEqual(
                         len(squashed_image.layers), len(image.layers) - 1)
 
+    def test_there_should_be_a_marker_file_in_the_squashed_layer_even_more_complex(self):
+        dockerfile = '''
+        FROM busybox
+        RUN touch /somefile_layer1
+        RUN rm /somefile_layer1
+        RUN touch /somefile_layer2
+        RUN touch /somefile_layer3
+        RUN rm /somefile_layer2
+        RUN touch /somefile_layer4
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(self.image, 2, self.tag) as squashed_image:
+                squashed_image.assertFileDoesNotExist('somefile_layer1')
+                squashed_image.assertFileDoesNotExist('somefile_layer2')
+                squashed_image.assertFileDoesNotExist('somefile_layer3')
+                squashed_image.assertFileExists('somefile_layer4')
+
+                squashed_image.assertFileDoesNotExist('.wh.somefile_layer1')
+                squashed_image.assertFileExists('.wh.somefile_layer2')
+                squashed_image.assertFileDoesNotExist('.wh.somefile_layer3')
+                squashed_image.assertFileDoesNotExist('.wh.somefile_layer4')
+
+                with self.Container(self.tag) as container:
+                    container.assertFileExists('somefile_layer3')
+                    container.assertFileExists('somefile_layer4')
+                    container.assertFileDoesNotExist('somefile_layer1')
+                    container.assertFileDoesNotExist('somefile_layer2')
+
+                    # We should have one layer less in the image
+                    self.assertEqual(
+                        len(squashed_image.layers), len(image.layers) - 1)
+
+    def test_should_handle_removal_of_directories(self):
+        dockerfile = '''
+        FROM busybox
+        RUN mkdir -p /some/dir/tree
+        RUN touch /some/dir/tree/file1
+        RUN touch /some/dir/tree/file2
+        RUN touch /some/dir/file1
+        RUN touch /some/dir/file2
+        RUN rm -rf /some/dir/tree
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(self.image, 2, self.tag) as squashed_image:
+                squashed_image.assertFileDoesNotExist('some/dir/tree/file1')
+                squashed_image.assertFileDoesNotExist('some/dir/tree/file2')
+                squashed_image.assertFileDoesNotExist('some/dir/file1')
+                squashed_image.assertFileExists('some/dir/file2')
+
+                squashed_image.assertFileExists('some/dir/.wh.tree')
+
+                with self.Container(self.tag) as container:
+                    container.assertFileExists('some/dir/file1')
+                    container.assertFileExists('some/dir/file2')
+                    container.assertFileDoesNotExist('some/dir/tree')
+                    container.assertFileDoesNotExist('some/dir/tree/file1')
+                    container.assertFileDoesNotExist('some/dir/tree/file2')
+
+                    # We should have one layer less in the image
+                    self.assertEqual(
+                        len(squashed_image.layers), len(image.layers) - 1)
 if __name__ == '__main__':
     unittest.main()

@@ -135,7 +135,7 @@ class Squash(object):
             self.log.debug("Generating list of files in layer '%s'..." % layer)
             tar_file = os.path.join(directory, layer, "layer.tar")
             with tarfile.open(tar_file, 'r', format=tarfile.PAX_FORMAT) as tar:
-                files[layer] = [o.name for o in tar.getmembers()]
+                files[layer] = tar.getnames()
             self.log.debug("Done, found %s files" % len(files[layer]))
 
         return files
@@ -280,8 +280,7 @@ class Squash(object):
                 with tarfile.open(layer_tar_file, 'r', format=tarfile.PAX_FORMAT) as layer_tar:
                     # Find all marker files for all layers
                     markers = self._marker_files(layer_tar)
-                    squashed_files = [
-                        o.name for o in squashed_tar.getmembers()]
+                    squashed_files = squashed_tar.getnames()
 
                     # Check if the previously skipped marker files can be removed,
                     # because maybe a file was added later on this path
@@ -318,8 +317,7 @@ class Squash(object):
 
                         # List of filenames in the squashed archive
                         # TODO: optimize this
-                        squashed_files = [
-                            o.name for o in squashed_tar.getmembers()]
+                        squashed_files = squashed_tar.getnames()
 
                         # Check if file is already added to the archive
                         if member.name in squashed_files:

@@ -327,7 +327,7 @@ class Squash(object):
                                 member, layer_tar.extractfile(member))
 
             if missed_markers:
-                self.log.debug("Missed marker files: %s" % missed_markers.keys())
+                self.log.debug("Missed marker files: %s" % [o.name for o in missed_markers.keys()])
 
             for marker, marker_file in six.iteritems(missed_markers):
                 actual_file = marker.name.replace('.wh.', '')
@@ -341,7 +341,9 @@ class Squash(object):
                 if should_be_added_back:
                     self.log.debug(
                         "Adding '%s' marker file back..." % marker.name)
-                    squashed_tar.addfile(marker, marker_file)
+                    # Marker files on AUFS are hardlinks, we need to create
+                    # regular files, therefore we need to recreate the tarinfo object
+                    squashed_tar.addfile(tarfile.TarInfo(name=marker.name), marker_file)
                 else:
                     self.log.debug(
                         "Skipping '%s' marker file..." % marker.name)

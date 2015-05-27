@@ -112,6 +112,12 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 assert name not in tar.getnames(
                 ), "File '%s' was found in the squashed layer files: %s" % (name, tar.getnames())
 
+        def assertFileIsNotHardLink(self, name):
+            self.squashed_layer.seek(0)  # Rewind
+            with tarfile.open(fileobj=self.squashed_layer, mode='r') as tar:
+                member = tar.getmember(name)
+                assert member.islnk() == False, "File '%s' should not be a hard link, but it is" % name
+
     class Container(object):
 
         def __init__(self, image):
@@ -222,6 +228,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 squashed_image.assertFileDoesNotExist('somefile_layer1')
                 squashed_image.assertFileExists('somefile_layer3')
                 squashed_image.assertFileExists('.wh.somefile_layer1')
+                squashed_image.assertFileIsNotHardLink('.wh.somefile_layer1')
 
                 with self.Container(squashed_image) as container:
                     container.assertFileExists('somefile_layer3')
@@ -251,6 +258,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
 
                 squashed_image.assertFileDoesNotExist('.wh.somefile_layer1')
                 squashed_image.assertFileExists('.wh.somefile_layer2')
+                squashed_image.assertFileIsNotHardLink('.wh.somefile_layer2')
                 squashed_image.assertFileDoesNotExist('.wh.somefile_layer3')
                 squashed_image.assertFileDoesNotExist('.wh.somefile_layer4')
 
@@ -283,6 +291,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 squashed_image.assertFileExists('some/dir/file2')
 
                 squashed_image.assertFileExists('some/dir/.wh.tree')
+                squashed_image.assertFileIsNotHardLink('some/dir/.wh.tree')
 
                 with self.Container(squashed_image) as container:
                     container.assertFileExists('some/dir/file1')
@@ -307,6 +316,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
             with self.SquashedImage(image, 2) as squashed_image:
                 squashed_image.assertFileDoesNotExist('file')
                 squashed_image.assertFileExists('.wh.file')
+                squashed_image.assertFileIsNotHardLink('.wh.file')
 
                 with self.Container(squashed_image) as container:
                     container.assertFileDoesNotExist('file')
@@ -356,6 +366,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 squashed_image.assertFileExists('some/dir/file2')
 
                 squashed_image.assertFileExists('some/dir/.wh.tree')
+                squashed_image.assertFileIsNotHardLink('some/dir/.wh.tree')
 
                 with self.Container(squashed_image) as container:
                     container.assertFileExists('some/dir/file1')
@@ -367,6 +378,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
                     # We should have one layer less in the image
                     self.assertEqual(
                         len(squashed_image.layers), len(image.layers) - 1)
+
 
 if __name__ == '__main__':
     unittest.main()

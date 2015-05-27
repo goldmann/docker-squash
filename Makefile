@@ -10,7 +10,7 @@ test-py34: clean
 clean:
 	@find . -name "*.pyc" -exec rm -rf {} \;
 
-release: test
+release: clean
 	python setup.py clean
 	python setup.py register
 	python setup.py sdist

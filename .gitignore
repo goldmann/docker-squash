@@ -1,1 +1,7 @@
 *.pyc
+*.tar
+*.xml
+*.swp
+*.tox
+dist
+*egg-info

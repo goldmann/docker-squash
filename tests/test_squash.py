@@ -186,8 +186,7 @@ class TestMarkerFiles(unittest.TestCase):
         markers = self.squash._marker_files(tar)
 
         self.assertTrue(len(markers) == 1)
-        member = markers['/opt/eap/.wh.to_skip']
-        self.assertTrue(member is not None)
+        self.assertTrue(list(markers)[0].name == '/opt/eap/.wh.to_skip')
 
     def test_should_return_empty_dict_when_no_files_are_in_the_tar(self):
         tar = mock.Mock()

@@ -1,4 +1,5 @@
 import unittest
+import pytest
 import mock
 import six
 import docker
@@ -9,6 +10,7 @@ import sys
 import tarfile
 import io
 from io import BytesIO
+import uuid
 
 from docker_scripts.squash import Squash
 from docker_scripts.errors import SquashError
@@ -31,10 +33,11 @@ class TestIntegMarkerFiles(unittest.TestCase):
 
     class Image(object):
 
-        def __init__(self, dockerfile, tag="integ:latest"):
+        def __init__(self, dockerfile):
             self.dockerfile = dockerfile
-            self.tag = tag
             self.docker = TestIntegMarkerFiles.docker
+            self.name = "integ-%s" % uuid.uuid1()
+            self.tag = "%s:latest" % self.name
 
         def __enter__(self):
             f = BytesIO(self.dockerfile.encode('utf-8'))
@@ -55,19 +58,19 @@ class TestIntegMarkerFiles(unittest.TestCase):
 
     class SquashedImage(object):
 
-        def __init__(self, image, number_of_layers, tag):
+        def __init__(self, image, number_of_layers):
             self.image = image
-            self.tag = tag
             self.number_of_layers = number_of_layers
             self.docker = TestIntegMarkerFiles.docker
             self.log = TestIntegMarkerFiles.log
+            self.tag = "%s:squashed" % self.image.name
 
         def __enter__(self):
             from_layer = self.docker.history(
-                self.image)[self.number_of_layers]['Id']
+                self.image.tag)[self.number_of_layers]['Id']
 
             squash = Squash(
-                self.log, self.image, self.docker, tag=self.tag, from_layer=from_layer)
+                self.log, self.image.tag, self.docker, tag=self.tag, from_layer=from_layer)
             squash.run()
             self.squashed_layer = self._squashed_layer()
             self.layers = [o['Id'] for o in self.docker.history(self.tag)]
@@ -117,7 +120,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
             self.log = TestIntegMarkerFiles.log
 
         def __enter__(self):
-            self.container = self.docker.create_container(image=self.image)
+            self.container = self.docker.create_container(image=self.image.tag)
             data = self.docker.export(self.container)
             self.content = six.BytesIO(data.read())
             return self
@@ -138,9 +141,6 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 assert name not in tar.getnames(
                 ), "File %s was found in the container files: %s" % (name, tar.getnames())
 
-    def setUp(self):
-        self.tag = "integ:squashed"
-        self.image = "integ:latest"
 
     def test_all_files_should_be_in_squashed_layer(self):
         """
@@ -154,7 +154,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
         '''
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(self.image, 3, self.tag) as squashed_image:
+            with self.SquashedImage(image, 3) as squashed_image:
                 squashed_image.assertFileDoesNotExist('.wh.somefile_layer1')
                 squashed_image.assertFileDoesNotExist('.wh.somefile_layer2')
                 squashed_image.assertFileDoesNotExist('.wh.somefile_layer3')
@@ -162,7 +162,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 squashed_image.assertFileExists('somefile_layer2')
                 squashed_image.assertFileExists('somefile_layer3')
 
-                with self.Container(self.tag) as container:
+                with self.Container(squashed_image) as container:
                     container.assertFileExists('somefile_layer1')
                     container.assertFileExists('somefile_layer2')
                     container.assertFileExists('somefile_layer3')
@@ -183,7 +183,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
         '''
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(self.image, 2, self.tag) as squashed_image:
+            with self.SquashedImage(image, 2) as squashed_image:
                 squashed_image.assertFileDoesNotExist('.wh.somefile_layer2')
                 squashed_image.assertFileDoesNotExist('.wh.somefile_layer3')
                 # This file should not be in the squashed layer
@@ -193,7 +193,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 squashed_image.assertFileExists('somefile_layer2')
                 squashed_image.assertFileExists('somefile_layer3')
 
-                with self.Container(self.tag) as container:
+                with self.Container(squashed_image) as container:
                     # This file should be in the container
                     container.assertFileExists('somefile_layer1')
                     container.assertFileExists('somefile_layer2')
@@ -218,12 +218,12 @@ class TestIntegMarkerFiles(unittest.TestCase):
         '''
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(self.image, 2, self.tag) as squashed_image:
+            with self.SquashedImage(image, 2) as squashed_image:
                 squashed_image.assertFileDoesNotExist('somefile_layer1')
                 squashed_image.assertFileExists('somefile_layer3')
                 squashed_image.assertFileExists('.wh.somefile_layer1')
 
-                with self.Container(self.tag) as container:
+                with self.Container(squashed_image) as container:
                     container.assertFileExists('somefile_layer3')
                     container.assertFileDoesNotExist('somefile_layer1')
 
@@ -243,7 +243,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
         '''
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(self.image, 2, self.tag) as squashed_image:
+            with self.SquashedImage(image, 2) as squashed_image:
                 squashed_image.assertFileDoesNotExist('somefile_layer1')
                 squashed_image.assertFileDoesNotExist('somefile_layer2')
                 squashed_image.assertFileDoesNotExist('somefile_layer3')
@@ -254,7 +254,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
                 squashed_image.assertFileDoesNotExist('.wh.somefile_layer3')
                 squashed_image.assertFileDoesNotExist('.wh.somefile_layer4')
 
-                with self.Container(self.tag) as container:
+                with self.Container(squashed_image) as container:
                     container.assertFileExists('somefile_layer3')
                     container.assertFileExists('somefile_layer4')
                     container.assertFileDoesNotExist('somefile_layer1')
@@ -276,7 +276,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
         '''
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(self.image, 2, self.tag) as squashed_image:
+            with self.SquashedImage(image, 2) as squashed_image:
                 squashed_image.assertFileDoesNotExist('some/dir/tree/file1')
                 squashed_image.assertFileDoesNotExist('some/dir/tree/file2')
                 squashed_image.assertFileDoesNotExist('some/dir/file1')
@@ -284,7 +284,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
 
                 squashed_image.assertFileExists('some/dir/.wh.tree')
 
-                with self.Container(self.tag) as container:
+                with self.Container(squashed_image) as container:
                     container.assertFileExists('some/dir/file1')
                     container.assertFileExists('some/dir/file2')
                     container.assertFileDoesNotExist('some/dir/tree')
@@ -294,5 +294,79 @@ class TestIntegMarkerFiles(unittest.TestCase):
                     # We should have one layer less in the image
                     self.assertEqual(
                         len(squashed_image.layers), len(image.layers) - 1)
+
+    def test_should_skip_files_when_these_are_modified_and_removed_in_squashed_layer(self):
+        dockerfile = '''
+        FROM busybox
+        RUN touch /file
+        RUN chmod -R 777 /file
+        RUN rm -rf /file
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2) as squashed_image:
+                squashed_image.assertFileDoesNotExist('file')
+                squashed_image.assertFileExists('.wh.file')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileDoesNotExist('file')
+
+                    # We should have one layer less in the image
+                    self.assertEqual(
+                        len(squashed_image.layers), len(image.layers) - 1)
+
+    def test_should_skip_files_when_these_are_removed_and_modified_in_squashed_layer(self):
+        dockerfile = '''
+        FROM busybox
+        RUN touch /file
+        RUN chmod -R 777 /file
+        RUN rm -rf /file
+        RUN touch /file
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 3) as squashed_image:
+                squashed_image.assertFileExists('file')
+                squashed_image.assertFileDoesNotExist('.wh.file')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('file')
+
+                    # We should have two layers less in the image
+                    self.assertEqual(
+                        len(squashed_image.layers), len(image.layers) - 2)
+
+    def test_should_handle_multiple_changes_to_files_in_squashed_layers(self):
+        dockerfile = '''
+        FROM busybox
+        RUN mkdir -p /some/dir/tree
+        RUN touch /some/dir/tree/file1
+        RUN touch /some/dir/tree/file2
+        RUN touch /some/dir/file1
+        RUN touch /some/dir/file2
+        RUN chmod -R 777 /some
+        RUN rm -rf /some/dir/tree
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2) as squashed_image:
+                squashed_image.assertFileDoesNotExist('some/dir/tree/file1')
+                squashed_image.assertFileDoesNotExist('some/dir/tree/file2')
+                squashed_image.assertFileExists('some/dir/file1')
+                squashed_image.assertFileExists('some/dir/file2')
+
+                squashed_image.assertFileExists('some/dir/.wh.tree')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('some/dir/file1')
+                    container.assertFileExists('some/dir/file2')
+                    container.assertFileDoesNotExist('some/dir/tree')
+                    container.assertFileDoesNotExist('some/dir/tree/file1')
+                    container.assertFileDoesNotExist('some/dir/tree/file2')
+
+                    # We should have one layer less in the image
+                    self.assertEqual(
+                        len(squashed_image.layers), len(image.layers) - 1)
+
 if __name__ == '__main__':
     unittest.main()

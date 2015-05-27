@@ -122,7 +122,7 @@ class Squash(object):
         for member in tar.getmembers():
             if '.wh.' in member.name:
                 self.log.debug("Found '%s' marker file" % member.name)
-                marker_files[member.name] = member
+                marker_files[member] = tar.extractfile(member)
 
         return marker_files
 
@@ -214,7 +214,6 @@ class Squash(object):
         to_leave = []
         should_squash = True
 
-
         for l in reversed(layers):
             if l == from_layer:
                 should_squash = False
@@ -264,8 +263,12 @@ class Squash(object):
         # to make the tar lighter
         layers_to_squash.reverse()
 
+        # Find all files in layers that we don't squash
+        files_in_layers = self._files_in_layers(layers_to_move, old_image_dir)
+
         with tarfile.open(squashed_tar_file, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
             to_skip = []
+            missed_markers = {}
 
             for layer_id in layers_to_squash:
                 layer_tar_file = os.path.join(
@@ -276,17 +279,23 @@ class Squash(object):
                 # Open the exiting layer to squash
                 with tarfile.open(layer_tar_file, 'r', format=tarfile.PAX_FORMAT) as layer_tar:
                     # Find all marker files for all layers
+                    # We need the list of marker files upfront, so we can
+                    # skip unnecessary files
                     markers = self._marker_files(layer_tar)
                     squashed_files = squashed_tar.getnames()
 
                     # Iterate over the marker files found for this particular
-                    # layer
-                    for marker_name in markers.keys():
-                        actual_file = marker_name.replace('.wh.', '')
-                        if self._file_should_be_skipped(actual_file, squashed_files):
-                            # Add all files (marker and actual) to skipped files
-                            to_skip.append(marker_name)
-                            to_skip.append(actual_file)
+                    # layer and if in the squashed layers file corresponding
+                    # to the marker file is found, then skip both files
+                    for marker, marker_file in six.iteritems(markers):
+                        actual_file = marker.name.replace('.wh.', '')
+                        to_skip.append(marker.name)
+                        to_skip.append(actual_file)
+
+                        if not self._file_should_be_skipped(actual_file, squashed_files):
+                            self.log.debug(
+                                "Marker file '%s' not found in the squashed files, we'll try at the end of squashing one more time" % marker.name)
+                            missed_markers[marker] = marker_file
 
                     # Copy all the files to the new tar
                     for member in layer_tar.getmembers():
@@ -317,6 +326,24 @@ class Squash(object):
                             squashed_tar.addfile(
                                 member, layer_tar.extractfile(member))
 
+            self.log.debug("Missed marker files: %s" % missed_markers.keys())
+
+            for marker, marker_file in six.iteritems(missed_markers):
+                actual_file = marker.name.replace('.wh.', '')
+                should_be_added_back = False
+
+                for files in files_in_layers.values():
+                    if not self._file_should_be_skipped(actual_file, files):
+                        should_be_added_back = True
+                        break
+
+                if should_be_added_back:
+                    self.log.debug(
+                        "Adding '%s' marker file back..." % marker.name)
+                    squashed_tar.addfile(marker, marker_file)
+                else:
+                    self.log.debug(
+                        "Skipping '%s' marker file..." % marker.name)
 
         self.log.info("Squashing finished!")
 
@@ -367,7 +394,8 @@ class Squash(object):
             sys.exit(1)
 
         # Find the layers to squash and to move
-        layers_to_squash, layers_to_move = self._layers_to_squash(old_layers, squash_id)
+        layers_to_squash, layers_to_move = self._layers_to_squash(
+            old_layers, squash_id)
 
         self.log.info("Attempting to squash from layer %s...", squash_id)
         self.log.info("Checking if squashing is necessary...")
@@ -420,7 +448,8 @@ class Squash(object):
         squashed_tar = os.path.join(squashed_dir, "layer.tar")
 
         # Append all the layers on each other
-        self._squash_layers(layers_to_squash, layers_to_move, squashed_tar, old_image_dir)
+        self._squash_layers(
+            layers_to_squash, layers_to_move, squashed_tar, old_image_dir)
 
         # Move all the layers that should be untouched
         self._move_layers(

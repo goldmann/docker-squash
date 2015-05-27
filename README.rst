@@ -8,6 +8,9 @@
    :target: https://landscape.io/github/goldmann/docker-scripts/master
       :alt: Code Health
 
+.. image:: https://badges.gitter.im/Join%20Chat.svg
+   :target: https://gitter.im/goldmann/docker-scripts
+
 A swiss-knife tool that could be useful for people working with Docker.
 
 Features

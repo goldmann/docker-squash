@@ -202,9 +202,9 @@ class Squash(object):
                 tar.add(".")
             self.log.debug("Archive generated")
 
-        self.log.info("Loading squashed image...")
+        self.log.debug("Loading squashed image...")
         self.docker.load_image(buf.getvalue())
-        self.log.info("Image loaded!")
+        self.log.debug("Image loaded!")
 
         buf.close()
 
@@ -326,7 +326,8 @@ class Squash(object):
                             squashed_tar.addfile(
                                 member, layer_tar.extractfile(member))
 
-            self.log.debug("Missed marker files: %s" % missed_markers.keys())
+            if missed_markers:
+                self.log.debug("Missed marker files: %s" % missed_markers.keys())
 
             for marker, marker_file in six.iteritems(missed_markers):
                 actual_file = marker.name.replace('.wh.', '')

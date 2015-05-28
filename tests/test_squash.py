@@ -1,6 +1,7 @@
 import unittest
 import mock
 import six
+import tarfile
 
 from docker_scripts.squash import Squash
 from docker_scripts.errors import SquashError
@@ -206,6 +207,34 @@ class TestMarkerFiles(unittest.TestCase):
 
         self.assertTrue(len(markers) == 0)
         self.assertTrue(markers == {})
+
+
+class TestAddMarkers(unittest.TestCase):
+
+    def setUp(self):
+        self.docker_client = mock.Mock()
+        self.log = mock.Mock()
+        self.image = "whatever"
+        self.squash = Squash(self.log, self.image, self.docker_client)
+
+    def test_should_not_fail_with_empty_list_of_markers_to_add(self):
+        self.squash._add_markers({}, None, None, None)
+
+    def test_should_add_all_marker_files_to_empty_tar(self):
+        tar = mock.Mock()
+
+        marker_1 = mock.Mock()
+        type(marker_1).name = mock.PropertyMock(return_value='marker_1')
+
+        markers = {marker_1:'file'}
+        with mock.patch('docker_scripts.squash.Squash._files_in_layers', return_value={}):
+            self.squash._add_markers(markers, tar, None, None)
+
+        self.assertTrue(len(tar.addfile.mock_calls) == 1)
+        tar_info, marker_file = tar.addfile.call_args[0]
+        self.assertIsInstance(tar_info, tarfile.TarInfo)
+        self.assertTrue(marker_file == 'file')
+        self.assertTrue(tar_info.isfile())
 
 if __name__ == '__main__':
     unittest.main()

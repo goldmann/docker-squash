@@ -276,10 +276,16 @@ class Squash(object):
             actual_file = marker.name.replace('.wh.', '')
             should_be_added_back = False
 
-            for files in files_in_layers.values():
-                if not self._file_should_be_skipped(actual_file, files):
-                    should_be_added_back = True
-                    break
+            if files_in_layers:
+                for files in files_in_layers.values():
+                    if not self._file_should_be_skipped(actual_file, files):
+                        should_be_added_back = True
+                        break
+            else:
+                # There are no previous layers, so we need to add it back
+                # In fact this shouldn't happen since having a marker file
+                # where there is no previous layer doesn not make sense.
+                should_be_added_back = True
 
             if should_be_added_back:
                 self.log.debug(

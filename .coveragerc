@@ -1,0 +1,5 @@
+[run]
+branch = True
+
+[html]
+directory = target/coverage-$ENVNAME

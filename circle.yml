@@ -1,6 +1,6 @@
 general:
   artifacts:
-    - "tests/target"
+    - "target"
 
 machine:
   python:

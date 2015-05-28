@@ -1,5 +1,0 @@
-[run]
-branch = True
-
-[html]
-directory = target/coverage-report

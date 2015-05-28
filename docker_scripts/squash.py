@@ -256,6 +256,42 @@ class Squash(object):
 
         return False
 
+    def _add_markers(self, markers, tar, layers_to_move, old_image_dir):
+        """
+        This method is responsible for adding back all markers that were not
+        added to the squashed layer AND files they refer to can be found in layers
+        we do not squash.
+        """
+
+        if markers:
+            self.log.debug("Marker files to add: %s" % [o.name for o in markers.keys()])
+        else:
+            # No marker files to add
+            return
+
+        # Find all files in layers that we don't squash
+        files_in_layers = self._files_in_layers(layers_to_move, old_image_dir)
+
+        for marker, marker_file in six.iteritems(markers):
+            actual_file = marker.name.replace('.wh.', '')
+            should_be_added_back = False
+
+            for files in files_in_layers.values():
+                if not self._file_should_be_skipped(actual_file, files):
+                    should_be_added_back = True
+                    break
+
+            if should_be_added_back:
+                self.log.debug(
+                    "Adding '%s' marker file back..." % marker.name)
+                # Marker files on AUFS are hardlinks, we need to create
+                # regular files, therefore we need to recreate the tarinfo object
+                tar.addfile(tarfile.TarInfo(name=marker.name), marker_file)
+            else:
+                self.log.debug(
+                    "Skipping '%s' marker file..." % marker.name)
+
+
     def _squash_layers(self, layers_to_squash, layers_to_move, squashed_tar_file, old_image_dir):
         self.log.info("Starting squashing...")
 
@@ -263,8 +299,6 @@ class Squash(object):
         # to make the tar lighter
         layers_to_squash.reverse()
 
-        # Find all files in layers that we don't squash
-        files_in_layers = self._files_in_layers(layers_to_move, old_image_dir)
 
         with tarfile.open(squashed_tar_file, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
             to_skip = []
@@ -326,27 +360,7 @@ class Squash(object):
                             squashed_tar.addfile(
                                 member, layer_tar.extractfile(member))
 
-            if missed_markers:
-                self.log.debug("Missed marker files: %s" % [o.name for o in missed_markers.keys()])
-
-            for marker, marker_file in six.iteritems(missed_markers):
-                actual_file = marker.name.replace('.wh.', '')
-                should_be_added_back = False
-
-                for files in files_in_layers.values():
-                    if not self._file_should_be_skipped(actual_file, files):
-                        should_be_added_back = True
-                        break
-
-                if should_be_added_back:
-                    self.log.debug(
-                        "Adding '%s' marker file back..." % marker.name)
-                    # Marker files on AUFS are hardlinks, we need to create
-                    # regular files, therefore we need to recreate the tarinfo object
-                    squashed_tar.addfile(tarfile.TarInfo(name=marker.name), marker_file)
-                else:
-                    self.log.debug(
-                        "Skipping '%s' marker file..." % marker.name)
+            self._add_markers(missed_markers, squashed_tar, layers_to_move, old_image_dir)
 
         self.log.info("Squashing finished!")
 

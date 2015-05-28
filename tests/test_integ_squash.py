@@ -19,7 +19,7 @@ if not six.PY3:
     import docker_scripts.lib.xtarfile
 
 
-class TestIntegMarkerFiles(unittest.TestCase):
+class TestIntegSquash(unittest.TestCase):
 
     docker = docker.Client(version='1.16')
 
@@ -35,7 +35,7 @@ class TestIntegMarkerFiles(unittest.TestCase):
 
         def __init__(self, dockerfile):
             self.dockerfile = dockerfile
-            self.docker = TestIntegMarkerFiles.docker
+            self.docker = TestIntegSquash.docker
             self.name = "integ-%s" % uuid.uuid1()
             self.tag = "%s:latest" % self.name
 
@@ -61,8 +61,8 @@ class TestIntegMarkerFiles(unittest.TestCase):
         def __init__(self, image, number_of_layers):
             self.image = image
             self.number_of_layers = number_of_layers
-            self.docker = TestIntegMarkerFiles.docker
-            self.log = TestIntegMarkerFiles.log
+            self.docker = TestIntegSquash.docker
+            self.log = TestIntegSquash.log
             self.tag = "%s:squashed" % self.image.name
 
         def __enter__(self):
@@ -122,8 +122,8 @@ class TestIntegMarkerFiles(unittest.TestCase):
 
         def __init__(self, image):
             self.image = image
-            self.docker = TestIntegMarkerFiles.docker
-            self.log = TestIntegMarkerFiles.log
+            self.docker = TestIntegSquash.docker
+            self.log = TestIntegSquash.log
 
         def __enter__(self):
             self.container = self.docker.create_container(image=self.image.tag)

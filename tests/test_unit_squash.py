@@ -224,9 +224,9 @@ class TestAddMarkers(unittest.TestCase):
         tar = mock.Mock()
 
         marker_1 = mock.Mock()
-        type(marker_1).name = mock.PropertyMock(return_value='marker_1')
+        type(marker_1).name = mock.PropertyMock(return_value='.wh.marker_1')
 
-        markers = {marker_1:'file'}
+        markers = {marker_1: 'file'}
         with mock.patch('docker_scripts.squash.Squash._files_in_layers', return_value={}):
             self.squash._add_markers(markers, tar, None, None)
 
@@ -235,6 +235,39 @@ class TestAddMarkers(unittest.TestCase):
         self.assertIsInstance(tar_info, tarfile.TarInfo)
         self.assertTrue(marker_file == 'file')
         self.assertTrue(tar_info.isfile())
+
+    def test_should_skip_a_marker_file_if_file_is_in_unsquashed_layers(self):
+        tar = mock.Mock()
+
+        marker_1 = mock.Mock()
+        type(marker_1).name = mock.PropertyMock(return_value='.wh.marker_1')
+        marker_2 = mock.Mock()
+        type(marker_2).name = mock.PropertyMock(return_value='.wh.marker_2')
+
+        markers = {marker_1: 'file1', marker_2: 'file2'}
+        with mock.patch('docker_scripts.squash.Squash._files_in_layers', return_value={'1234layerdid': ['some/file', 'marker_1']}):
+            self.squash._add_markers(markers, tar, None, None)
+
+        self.assertTrue(len(tar.addfile.mock_calls) == 1)
+        tar_info, marker_file = tar.addfile.call_args[0]
+        self.assertIsInstance(tar_info, tarfile.TarInfo)
+        self.assertTrue(marker_file == 'file2')
+        self.assertTrue(tar_info.isfile())
+
+    def test_should_not_add_any_marker_files(self):
+        tar = mock.Mock()
+
+        marker_1 = mock.Mock()
+        type(marker_1).name = mock.PropertyMock(return_value='.wh.marker_1')
+        marker_2 = mock.Mock()
+        type(marker_2).name = mock.PropertyMock(return_value='.wh.marker_2')
+
+        markers = {marker_1: 'file1', marker_2: 'file2'}
+        with mock.patch('docker_scripts.squash.Squash._files_in_layers', return_value={'1234layerdid': ['some/file', 'marker_1', 'marker_2']}):
+            self.squash._add_markers(markers, tar, None, None)
+
+        self.assertTrue(len(tar.addfile.mock_calls) == 0)
+
 
 if __name__ == '__main__':
     unittest.main()

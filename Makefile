@@ -1,20 +1,24 @@
-test: clean
-	CIRCLE_TEST_REPORTS=. tox
+test: prepare
+	tox -- tests
 
-test-unit: clean
-	CIRCLE_TEST_REPORTS=. tox -- tests/test_unit*
+test-unit: prepare
+	tox -- tests/test_unit*
 
-test-integ: clean
-	CIRCLE_TEST_REPORTS=. tox -- tests/test_integ*
+test-integ: prepare
+	tox -- tests/test_integ*
 
-test-py27: clean
-	CIRCLE_TEST_REPORTS=. tox -e py27
+test-py27: prepare
+	tox -e py27
 
-test-py34: clean
-	CIRCLE_TEST_REPORTS=. tox -e py34
+test-py34: prepare
+	tox -e py34
 
 clean:
 	@find . -name "*.pyc" -exec rm -rf {} \;
+	@rm -rf target
+
+prepare: clean
+	@mkdir target
 
 release: clean
 	python setup.py clean

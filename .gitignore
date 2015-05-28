@@ -5,3 +5,5 @@
 *.tox
 dist
 *egg-info
+target
+.coverage

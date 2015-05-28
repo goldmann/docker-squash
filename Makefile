@@ -1,6 +1,12 @@
 test: clean
 	CIRCLE_TEST_REPORTS=. tox
 
+test-unit: clean
+	CIRCLE_TEST_REPORTS=. tox -- tests/test_unit*
+
+test-integ: clean
+	CIRCLE_TEST_REPORTS=. tox -- tests/test_integ*
+
 test-py27: clean
 	CIRCLE_TEST_REPORTS=. tox -e py27
 

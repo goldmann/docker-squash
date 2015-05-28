@@ -7,12 +7,6 @@ test-unit: prepare
 test-integ: prepare
 	tox -- tests/test_integ*
 
-test-py27: prepare
-	tox -e py27
-
-test-py34: prepare
-	tox -e py34
-
 clean:
 	@find . -name "*.pyc" -exec rm -rf {} \;
 	@rm -rf target

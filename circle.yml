@@ -15,3 +15,7 @@ dependencies:
 test:
   override:
     - tox
+
+notify:
+  webhooks:
+    - url: $GITTER_WEBHOOK_URL

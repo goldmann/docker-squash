@@ -1,3 +1,7 @@
+general:
+  artifacts:
+    - "tests/target"
+
 machine:
   python:
   services:

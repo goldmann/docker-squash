@@ -2,4 +2,4 @@
 branch = True
 
 [html]
-directory = $CIRCLE_TEST_REPORTS/coverage-report
+directory = target/coverage-report

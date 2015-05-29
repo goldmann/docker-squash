@@ -49,6 +49,7 @@ class TestIntegSquash(unittest.TestCase):
 
             self.history = self.docker.history(self.tag)
             self.layers = [o['Id'] for o in self.history]
+            self.metadata = self.docker.inspect_image(self.tag)
 
             return self
 
@@ -74,6 +75,7 @@ class TestIntegSquash(unittest.TestCase):
             squash.run()
             self.squashed_layer = self._squashed_layer()
             self.layers = [o['Id'] for o in self.docker.history(self.tag)]
+            self.metadata = self.docker.inspect_image(self.tag)
             return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):
@@ -378,6 +380,18 @@ class TestIntegSquash(unittest.TestCase):
                     # We should have one layer less in the image
                     self.assertEqual(
                         len(squashed_image.layers), len(image.layers) - 1)
+
+
+    # https://github.com/goldmann/docker-scripts/issues/28
+    def test_docker_version_in_metadata_should_be_set_after_squashing(self):
+        dockerfile = '''
+        FROM busybox
+        RUN touch file
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2) as squashed_image:
+                self.assertEqual(image.metadata['DockerVersion'], squashed_image.metadata['DockerVersion'])
 
 
 if __name__ == '__main__':

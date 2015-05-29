@@ -140,27 +140,32 @@ class Squash(object):
 
         return files
 
-    def _generate_target_json(self, old_image_id, new_image_id, squash_id, squashed_dir):
+    def _generate_target_json(self, old_image_id, old_image_dir, new_image_id, squash_id, squashed_dir):
         json_file = os.path.join(squashed_dir, "json")
+        old_json_file = os.path.join(old_image_dir, old_image_id, "json")
         squashed_tar = os.path.join(squashed_dir, "layer.tar")
+
         # Read the original metadata
-        metadata = self.docker.inspect_image(old_image_id)
+        with open(old_json_file, 'r') as f:
+            metadata = json.load(f)
 
         # Update the fields
-        metadata['Id'] = new_image_id
-        metadata['Parent'] = squash_id
-        metadata['Config']['Image'] = squash_id
-        metadata['Created'] = datetime.datetime.utcnow().strftime(
+        metadata['id'] = new_image_id
+        metadata['parent'] = squash_id
+        metadata['config']['Image'] = squash_id
+        metadata['created'] = datetime.datetime.utcnow().strftime(
             '%Y-%m-%dT%H:%M:%S.%fZ')
-        metadata['Size'] = os.path.getsize(squashed_tar)
+        metadata['size'] = os.path.getsize(squashed_tar)
 
         # Remove unnecessary fields
-        del metadata['ContainerConfig']
-        del metadata['Container']
-        del metadata['Config']['Hostname']
+        del metadata['container_config']
+        del metadata['container']
+        del metadata['config']['Hostname']
+
+        json_metadata = json.dumps(metadata)
 
         with open(json_file, 'w') as f:
-            json.dump(metadata, f)
+            f.write(json_metadata)
 
     def _generate_repositories_json(self, repositories_file, image_id, name, tag):
         if not image_id:
@@ -480,7 +485,7 @@ class Squash(object):
 
         # Generate the metadata JSON based on the original one
         self._generate_target_json(
-            old_image_id, new_image_id, squash_id, squashed_dir)
+            old_image_id, old_image_dir, new_image_id, squash_id, squashed_dir)
 
         # Generate the metadata JSON with information about the images
         self._generate_repositories_json(

@@ -16,6 +16,7 @@ dependencies:
 
 test:
   override:
-    - make test
+    - case $CIRCLE_NODE_INDEX in 0) make test-py27 ;; 1) make test-py34 ;; esac:
+        parallel: true
   post:
     - make hook-gitter

@@ -1,6 +1,12 @@
 test: prepare
 	tox -- tests
 
+test-py27: prepare
+	tox -e py27 -- tests
+
+test-py34: prepare
+	tox -e py34 -- tests
+
 test-unit: prepare
 	tox -- tests/test_unit*
 

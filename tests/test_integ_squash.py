@@ -438,7 +438,7 @@ class TestIntegSquash(unittest.TestCase):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2) as squashed_image:
-                self.assertEqual(image.metadata['Size'], 0)
+                self.assertIsInstance(image.metadata['Size'], int)
                 with self.assertRaisesRegexp(KeyError, "'size'"):
                     self.assertEqual(image.metadata['size'], None)
 

@@ -13,6 +13,10 @@ test-unit: prepare
 test-integ: prepare
 	tox -- tests/test_integ*
 
+ci-publish-junit:
+	@mkdir -p ${CIRCLE_TEST_REPORTS}
+	@cp target/junit*.xml ${CIRCLE_TEST_REPORTS}
+
 clean:
 	@find . -name "*.pyc" -exec rm -rf {} \;
 	@rm -rf target

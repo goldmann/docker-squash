@@ -195,7 +195,15 @@ class Squash(object):
         with tarfile.open(output_path, 'w') as tar:
             self.log.debug("Generating tar archive for the squashed image...")
             with Chdir(directory):
-                tar.add(".")
+                # docker produces images like this:
+                #   repositories
+                #   <layer>/json
+                # and not:
+                #   ./
+                #   ./repositories
+                #   ./<layer>/json
+                for f in os.listdir("."):
+                    tar.add(f)
             self.log.debug("Archive generated")
 
     def _load_image(self, directory):

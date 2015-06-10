@@ -59,27 +59,31 @@ class TestIntegSquash(unittest.TestCase):
 
     class SquashedImage(object):
 
-        def __init__(self, image, number_of_layers):
+        def __init__(self, image, number_of_layers, output_path=None):
             self.image = image
             self.number_of_layers = number_of_layers
             self.docker = TestIntegSquash.docker
             self.log = TestIntegSquash.log
             self.tag = "%s:squashed" % self.image.name
+            self.output_path = output_path
 
         def __enter__(self):
             from_layer = self.docker.history(
                 self.image.tag)[self.number_of_layers]['Id']
 
             squash = Squash(
-                self.log, self.image.tag, self.docker, tag=self.tag, from_layer=from_layer)
-            squash.run()
-            self.squashed_layer = self._squashed_layer()
-            self.layers = [o['Id'] for o in self.docker.history(self.tag)]
-            self.metadata = self.docker.inspect_image(self.tag)
+                self.log, self.image.tag, self.docker, tag=self.tag, from_layer=from_layer, output_path=self.output_path)
+            self.image_id = squash.run()
+
+            if not self.output_path:
+                self.squashed_layer = self._squashed_layer()
+                self.layers = [o['Id'] for o in self.docker.history(self.tag)]
+                self.metadata = self.docker.inspect_image(self.tag)
+
             return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):
-            if not os.getenv('CI'):
+            if not (os.getenv('CI') or self.output_path):
                 self.docker.remove_image(image=self.tag, force=True)
 
         def _save_image(self):
@@ -118,7 +122,8 @@ class TestIntegSquash(unittest.TestCase):
             self.squashed_layer.seek(0)  # Rewind
             with tarfile.open(fileobj=self.squashed_layer, mode='r') as tar:
                 member = tar.getmember(name)
-                assert member.islnk() == False, "File '%s' should not be a hard link, but it is" % name
+                assert member.islnk(
+                ) == False, "File '%s' should not be a hard link, but it is" % name
 
     class Container(object):
 
@@ -148,7 +153,6 @@ class TestIntegSquash(unittest.TestCase):
             with tarfile.open(fileobj=self.content, mode='r') as tar:
                 assert name not in tar.getnames(
                 ), "File %s was found in the container files: %s" % (name, tar.getnames())
-
 
     def test_all_files_should_be_in_squashed_layer(self):
         """
@@ -381,7 +385,6 @@ class TestIntegSquash(unittest.TestCase):
                     self.assertEqual(
                         len(squashed_image.layers), len(image.layers) - 1)
 
-
     # https://github.com/goldmann/docker-scripts/issues/28
     def test_docker_version_in_metadata_should_be_set_after_squashing(self):
         dockerfile = '''
@@ -391,8 +394,53 @@ class TestIntegSquash(unittest.TestCase):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2) as squashed_image:
-                self.assertEqual(image.metadata['DockerVersion'], squashed_image.metadata['DockerVersion'])
+                self.assertEqual(
+                    image.metadata['DockerVersion'], squashed_image.metadata['DockerVersion'])
 
+    # https://github.com/goldmann/docker-scripts/issues/30
+    # https://github.com/goldmann/docker-scripts/pull/31
+    def test_files_in_squashed_tar_not_prefixed_wth_dot(self):
+        dockerfile = '''
+        FROM busybox
+        RUN touch file
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2, output_path="image.tar") as squashed_image:
+                with tarfile.open("image.tar", mode='r') as tar:
+                    all_files = tar.getnames()
+                    for name in all_files:
+                        self.assertFalse(name.startswith('.'))
+
+    # https://github.com/goldmann/docker-scripts/issues/32
+    def test_version_file_exists_in_squashed_layer(self):
+        dockerfile = '''
+        FROM busybox
+        RUN touch file
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2, output_path="image.tar") as squashed_image:
+                with tarfile.open("image.tar", mode='r') as tar:
+                    all_files = tar.getnames()
+                    self.assertIn(squashed_image.image_id + "/json", all_files)
+                    self.assertIn(
+                        squashed_image.image_id + "/layer.tar", all_files)
+                    self.assertIn(
+                        squashed_image.image_id + "/VERSION", all_files)
+
+    # https://github.com/goldmann/docker-scripts/issues/33
+    def test_docker_size_in_metadata_should_be_upper_case(self):
+        dockerfile = '''
+        FROM busybox
+        RUN touch file
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2) as squashed_image:
+                self.assertEqual(image.metadata['Size'], 0)
+                with self.assertRaisesRegexp(KeyError, "'size'"):
+                    self.assertEqual(image.metadata['size'], None)
 
 if __name__ == '__main__':
     unittest.main()

@@ -140,8 +140,9 @@ class Squash(object):
 
         return files
 
-    def _generate_target_json(self, old_image_id, old_image_dir, new_image_id, squash_id, squashed_dir):
+    def _generate_target_metadata(self, old_image_id, old_image_dir, new_image_id, squash_id, squashed_dir):
         json_file = os.path.join(squashed_dir, "json")
+        version_file = os.path.join(squashed_dir, "VERSION")
         old_json_file = os.path.join(old_image_dir, old_image_id, "json")
         squashed_tar = os.path.join(squashed_dir, "layer.tar")
 
@@ -155,7 +156,7 @@ class Squash(object):
         metadata['config']['Image'] = squash_id
         metadata['created'] = datetime.datetime.utcnow().strftime(
             '%Y-%m-%dT%H:%M:%S.%fZ')
-        metadata['size'] = os.path.getsize(squashed_tar)
+        metadata['Size'] = os.path.getsize(squashed_tar)
 
         # Remove unnecessary fields
         del metadata['container_config']
@@ -166,6 +167,9 @@ class Squash(object):
 
         with open(json_file, 'w') as f:
             f.write(json_metadata)
+
+        with open(version_file, 'w') as f:
+            f.write("1.0")
 
     def _generate_repositories_json(self, repositories_file, image_id, name, tag):
         if not image_id:
@@ -277,7 +281,8 @@ class Squash(object):
         """
 
         if markers:
-            self.log.debug("Marker files to add: %s" % [o.name for o in markers.keys()])
+            self.log.debug("Marker files to add: %s" %
+                           [o.name for o in markers.keys()])
         else:
             # No marker files to add
             return
@@ -304,12 +309,12 @@ class Squash(object):
                 self.log.debug(
                     "Adding '%s' marker file back..." % marker.name)
                 # Marker files on AUFS are hardlinks, we need to create
-                # regular files, therefore we need to recreate the tarinfo object
+                # regular files, therefore we need to recreate the tarinfo
+                # object
                 tar.addfile(tarfile.TarInfo(name=marker.name), marker_file)
             else:
                 self.log.debug(
                     "Skipping '%s' marker file..." % marker.name)
-
 
     def _squash_layers(self, layers_to_squash, layers_to_move, squashed_tar_file, old_image_dir):
         self.log.info("Starting squashing...")
@@ -317,7 +322,6 @@ class Squash(object):
         # Reverse the layers to squash - we begin with the newest one
         # to make the tar lighter
         layers_to_squash.reverse()
-
 
         with tarfile.open(squashed_tar_file, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
             to_skip = []
@@ -379,7 +383,8 @@ class Squash(object):
                             squashed_tar.addfile(
                                 member, layer_tar.extractfile(member))
 
-            self._add_markers(missed_markers, squashed_tar, layers_to_move, old_image_dir)
+            self._add_markers(
+                missed_markers, squashed_tar, layers_to_move, old_image_dir)
 
         self.log.info("Squashing finished!")
 
@@ -491,8 +496,8 @@ class Squash(object):
         self._move_layers(
             layers_to_move, old_image_dir, new_image_dir)
 
-        # Generate the metadata JSON based on the original one
-        self._generate_target_json(
+        # Generate the metadata based on the original one
+        self._generate_target_metadata(
             old_image_id, old_image_dir, new_image_id, squash_id, squashed_dir)
 
         # Generate the metadata JSON with information about the images

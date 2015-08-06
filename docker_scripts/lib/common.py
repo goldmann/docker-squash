@@ -27,7 +27,7 @@ def docker_client():
     base_url = os.getenv('DOCKER_CONNECTION', 'unix://var/run/docker.sock')
 
     try:
-        client = docker.Client(base_url=base_url, timeout=timeout)
+        client = docker.AutoVersionClient(base_url=base_url, timeout=timeout)
     except docker.errors.DockerException as e:
         print("Error while creating the Docker client: %s" % e)
         print(

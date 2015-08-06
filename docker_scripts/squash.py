@@ -389,6 +389,9 @@ class Squash(object):
         self.log.info("Squashing finished!")
 
     def run(self):
+        if self.image is None:
+            self.log.error("Image is not provided, exiting")
+            sys.exit(1)
 
         self.log.info("Squashing image '%s'..." % self.image)
 

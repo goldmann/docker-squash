@@ -268,6 +268,18 @@ class TestAddMarkers(unittest.TestCase):
 
         self.assertTrue(len(tar.addfile.mock_calls) == 0)
 
+class TestGeneral(unittest.TestCase):
+
+    def setUp(self):
+        self.docker_client = mock.Mock()
+        self.log = mock.Mock()
+
+    def test_handle_case_when_no_image_is_provided(self):
+        squash = Squash(self.log, None, self.docker_client)
+        with self.assertRaises(SystemExit) as cm:
+            squash.run()
+        self.assertEqual(cm.exception.code, 1)
+        self.log.error.assert_called_with("Image is not provided, exiting")
 
 if __name__ == '__main__':
     unittest.main()

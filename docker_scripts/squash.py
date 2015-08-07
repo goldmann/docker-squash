@@ -13,6 +13,7 @@ import six
 
 from docker_scripts.lib import common
 from docker_scripts.errors import SquashError
+from docker_scripts import version
 
 if not six.PY3:
     import lib.xtarfile
@@ -389,6 +390,9 @@ class Squash(object):
         self.log.info("Squashing finished!")
 
     def run(self):
+        docker_version = self.docker.version()
+        self.log.info("Running version %s, Docker %s, API %s..." % (version.version, docker_version['GitCommit'], docker_version['ApiVersion']))
+
         if self.image is None:
             self.log.error("Image is not provided, exiting")
             sys.exit(1)

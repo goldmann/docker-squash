@@ -271,8 +271,9 @@ class TestAddMarkers(unittest.TestCase):
 class TestGeneral(unittest.TestCase):
 
     def setUp(self):
-        self.docker_client = mock.Mock()
         self.log = mock.Mock()
+        self.docker_client = mock.Mock()
+        self.docker_client.version.return_value = {'GitCommit': "commit/9.9.9", 'ApiVersion': "9.99"}
 
     def test_handle_case_when_no_image_is_provided(self):
         squash = Squash(self.log, None, self.docker_client)

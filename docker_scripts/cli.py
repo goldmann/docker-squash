@@ -4,7 +4,8 @@ import argparse
 import logging
 import sys
 
-from docker_scripts import squash, layers, version
+from docker_scripts import squash, layers
+from docker_scripts.version import version
 
 
 class MyParser(argparse.ArgumentParser):
@@ -41,7 +42,7 @@ class CLI(object):
             '-v', '--verbose', action='store_true', help='Verbose output')
 
         parser.add_argument(
-            '--version', action='version', help='Show version and exit', version=version.version)
+            '--version', action='version', help='Show version and exit', version=version)
 
         subparsers = parser.add_subparsers(title='Available commands')
 

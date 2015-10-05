@@ -36,7 +36,8 @@ class Chdir(object):
 
 class Squash(object):
 
-    def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None, output_path=None):
+    def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None,
+                 output_path=None, load_output_back=False):
         self.log = log
         self.docker = docker
         self.image = image
@@ -44,6 +45,7 @@ class Squash(object):
         self.tag = tag
         self.tmp_dir = tmp_dir
         self.output_path = output_path
+        self.load_output_back = load_output_back
 
         if not docker:
             self.docker = common.docker_client()
@@ -518,8 +520,8 @@ class Squash(object):
             # without loading into Docker
             self._tar_image(self.output_path, new_image_dir)
             self.log.info("Image available at '%s'" % self.output_path)
-        else:
-            # Load image into Docker
+        if not self.output_path or self.load_output_back:
+            # If we don't have output path or load_output_back is True, then load image into Docker
             self._load_image(new_image_dir)
             self.log.info("Image registered in Docker daemon")
 

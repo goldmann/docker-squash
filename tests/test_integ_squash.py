@@ -59,23 +59,25 @@ class TestIntegSquash(unittest.TestCase):
 
     class SquashedImage(object):
 
-        def __init__(self, image, number_of_layers, output_path=None):
+        def __init__(self, image, number_of_layers, output_path=None, load_output_back=False):
             self.image = image
             self.number_of_layers = number_of_layers
             self.docker = TestIntegSquash.docker
             self.log = TestIntegSquash.log
             self.tag = "%s:squashed" % self.image.name
             self.output_path = output_path
+            self.load_output_back = load_output_back
 
         def __enter__(self):
             from_layer = self.docker.history(
                 self.image.tag)[self.number_of_layers]['Id']
 
             squash = Squash(
-                self.log, self.image.tag, self.docker, tag=self.tag, from_layer=from_layer, output_path=self.output_path)
+                self.log, self.image.tag, self.docker, tag=self.tag, from_layer=from_layer,
+                output_path=self.output_path, load_output_back=self.load_output_back)
             self.image_id = squash.run()
 
-            if not self.output_path:
+            if not self.output_path or self.load_output_back:
                 self.squashed_layer = self._squashed_layer()
                 self.layers = [o['Id'] for o in self.docker.history(self.tag)]
                 self.metadata = self.docker.inspect_image(self.tag)
@@ -441,6 +443,27 @@ class TestIntegSquash(unittest.TestCase):
                 self.assertIsInstance(image.metadata['Size'], int)
                 with self.assertRaisesRegexp(KeyError, "'size'"):
                     self.assertEqual(image.metadata['size'], None)
+
+    def test_load_output_back_produces_file_and_engine_image(self):
+        dockerfile = '''
+        FROM busybox
+        RUN touch file
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2, output_path="image.tar", load_output_back=True) \
+                    as squashed_image:
+                # first, make sure that the exported image exists and is ok
+                with tarfile.open("image.tar", mode='r') as tar:
+                    all_files = tar.getnames()
+                    self.assertIn(squashed_image.image_id + "/json", all_files)
+                    self.assertIn(
+                        squashed_image.image_id + "/layer.tar", all_files)
+                    self.assertIn(
+                        squashed_image.image_id + "/VERSION", all_files)
+
+                # then also make sure that the image loaded back exists and is ok
+                self.assertIsInstance(image.metadata['Size'], int)
 
 if __name__ == '__main__':
     unittest.main()

@@ -82,7 +82,7 @@ class CLI(object):
         else:
             self.log.setLevel(logging.INFO)
 
-        self.log.debug("Running version %s", version.version)
+        self.log.debug("Running version %s", version)
 
         args.func(args)
 

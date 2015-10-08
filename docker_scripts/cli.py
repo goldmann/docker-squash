@@ -28,7 +28,7 @@ class CLI(object):
 
     def run_squash(self, args):
         squash.Squash(log=self.log, image=args.image,
-                      from_layer=args.from_layer, tag=args.tag, output_path=args.output_path).run()
+                      from_layer=args.from_layer, tag=args.tag, output_path=args.output_path, tmp_dir=args.tmp_dir).run()
 
     def run_layers(self, args):
         layers.Layers(log=self.log, image=args.image,

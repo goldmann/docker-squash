@@ -37,7 +37,7 @@ class Chdir(object):
 class Squash(object):
 
     def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None,
-                 output_path=None, load_output_back=False):
+                 output_path=None, load_image=True):
         self.log = log
         self.docker = docker
         self.image = image
@@ -45,7 +45,7 @@ class Squash(object):
         self.tag = tag
         self.tmp_dir = tmp_dir
         self.output_path = output_path
-        self.load_output_back = load_output_back
+        self.load_image = load_image
 
         if not docker:
             self.docker = common.docker_client()
@@ -399,6 +399,10 @@ class Squash(object):
             self.log.error("Image is not provided, exiting")
             sys.exit(1)
 
+        if not (self.output_path or self.load_image):
+            self.log.warn("No output path specified and loading into Docker is not selected either; squashed image would not accessible, proceeding with squashing doesn't make sense, exiting")
+            sys.exit(0)
+
         self.log.info("Squashing image '%s'..." % self.image)
 
         # The image id or name of the image to be squashed
@@ -516,14 +520,14 @@ class Squash(object):
         self.log.info("Squashed image name: %s:%s" % (image_name, image_tag))
 
         if self.output_path:
-            # Move the tar archive to the specified path and exit
-            # without loading into Docker
+            # Move the tar archive to the specified path
             self._tar_image(self.output_path, new_image_dir)
             self.log.info("Image available at '%s'" % self.output_path)
-        if not self.output_path or self.load_output_back:
-            # If we don't have output path or load_output_back is True, then load image into Docker
+
+        if self.load_image:
+            # Load squashed image into Docker
             self._load_image(new_image_dir)
-            self.log.info("Image registered in Docker daemon")
+            self.log.info("Image registered in Docker daemon as %s:%s" % (image_name, image_tag))
 
         # Cleanup the temporary directory
         shutil.rmtree(tmp_dir)

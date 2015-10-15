@@ -277,17 +277,15 @@ class TestGeneral(unittest.TestCase):
 
     def test_handle_case_when_no_image_is_provided(self):
         squash = Squash(self.log, None, self.docker_client)
-        with self.assertRaises(SystemExit) as cm:
+        with self.assertRaises(SquashError) as cm:
             squash.run()
-        self.assertEqual(cm.exception.code, 1)
-        self.log.error.assert_called_with("Image is not provided, exiting")
+        self.assertEquals(
+            str(cm.exception), "Image is not provided")
 
     def test_exit_if_no_output_path_provided_and_loading_is_disabled_too(self):
         squash = Squash(self.log, 'image', self.docker_client, load_image=False, output_path=None)
-        with self.assertRaises(SystemExit) as cm:
-            squash.run()
-        self.assertEqual(cm.exception.code, 0)
-        self.log.warn.assert_called_with("No output path specified and loading into Docker is not selected either; squashed image would not accessible, proceeding with squashing doesn't make sense, exiting")
+        squash.run()
+        self.log.warn.assert_called_with("No output path specified and loading into Docker is not selected either; squashed image would not accessible, proceeding with squashing doesn't make sense")
 
 if __name__ == '__main__':
     unittest.main()

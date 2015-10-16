@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import sys
 import json
 import tempfile
 import shutil
@@ -37,7 +36,7 @@ class Chdir(object):
 class Squash(object):
 
     def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None,
-                 output_path=None, load_output_back=False):
+                 output_path=None, load_image=True):
         self.log = log
         self.docker = docker
         self.image = image
@@ -45,7 +44,7 @@ class Squash(object):
         self.tag = tag
         self.tmp_dir = tmp_dir
         self.output_path = output_path
-        self.load_output_back = load_output_back
+        self.load_image = load_image
 
         if not docker:
             self.docker = common.docker_client()
@@ -80,9 +79,7 @@ class Squash(object):
                 self.log.warn(
                     "An error occured while saving the %s image, retrying..." % image_id)
 
-        self.log.error("Couldn't save %s image!" % image_id)
-
-        return False
+        raise SquashError("Couldn't save %s image!" % image_id)
 
     def _unpack(self, tar_file, directory):
         """ Unpacks tar archive to selected directory """
@@ -396,8 +393,11 @@ class Squash(object):
         self.log.info("Running version %s, Docker %s, API %s..." % (version, docker_version['GitCommit'], docker_version['ApiVersion']))
 
         if self.image is None:
-            self.log.error("Image is not provided, exiting")
-            sys.exit(1)
+            raise SquashError("Image is not provided")
+
+        if not (self.output_path or self.load_image):
+            self.log.warn("No output path specified and loading into Docker is not selected either; squashed image would not accessible, proceeding with squashing doesn't make sense")
+            return
 
         self.log.info("Squashing image '%s'..." % self.image)
 
@@ -405,9 +405,8 @@ class Squash(object):
         try:
             old_image_id = self.docker.inspect_image(self.image)['Id']
         except SquashError:
-            self.log.error(
+            raise SquashError(
                 "Could not get the image ID to squash, please check provided 'image' argument: %s" % self.image)
-            sys.exit(1)
 
         if self.tag:
             image_name, image_tag = self._parse_image_name(self.tag)
@@ -430,18 +429,16 @@ class Squash(object):
 
         try:
             squash_id = self.docker.inspect_image(from_layer)['Id']
-        except SquashError:
-            self.log.error(
+        except:
+            raise SquashError(
                 "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % from_layer)
-            sys.exit(1)
 
         self.log.info("Old image has %s layers", len(old_layers))
         self.log.debug("Old layers: %s", old_layers)
 
         if not squash_id in old_layers:
-            self.log.error("Couldn't find the provided layer (%s) in the %s image" % (
+            raise SquashError("Couldn't find the provided layer (%s) in the %s image" % (
                 self.from_layer, self.image))
-            sys.exit(1)
 
         # Find the layers to squash and to move
         layers_to_squash, layers_to_move = self._layers_to_squash(
@@ -452,8 +449,8 @@ class Squash(object):
 
         if len(layers_to_squash) <= 1:
             self.log.warning(
-                "%s layer(s) in this image marked to squash, no squashing is required, exiting" % len(layers_to_squash))
-            sys.exit(0)
+                "%s layer(s) in this image marked to squash, no squashing is required" % len(layers_to_squash))
+            return
 
         self.log.info("We have %s layers to squash", len(layers_to_squash))
         self.log.debug("Layers to squash: %s", layers_to_squash)
@@ -462,15 +459,13 @@ class Squash(object):
         try:
             tmp_dir = self._prepare_tmp_directory(self.tmp_dir)
         except:
-            self.log.error("Preparing temporary directory failed, aborting")
-            sys.exit(1)
+            raise SquashError("Preparing temporary directory failed")
 
         # Location of the tar with the old image
         old_image_tar = os.path.join(tmp_dir, "image.tar")
 
         # Save the image in tar format in the tepmorary directory
-        if not self._save_image(old_image_id, old_image_tar):
-            sys.exit(1)
+        self._save_image(old_image_id, old_image_tar)
 
         # Directory where the old layers will be unpacked
         old_image_dir = os.path.join(tmp_dir, "old")
@@ -516,14 +511,14 @@ class Squash(object):
         self.log.info("Squashed image name: %s:%s" % (image_name, image_tag))
 
         if self.output_path:
-            # Move the tar archive to the specified path and exit
-            # without loading into Docker
+            # Move the tar archive to the specified path
             self._tar_image(self.output_path, new_image_dir)
             self.log.info("Image available at '%s'" % self.output_path)
-        if not self.output_path or self.load_output_back:
-            # If we don't have output path or load_output_back is True, then load image into Docker
+
+        if self.load_image:
+            # Load squashed image into Docker
             self._load_image(new_image_dir)
-            self.log.info("Image registered in Docker daemon")
+            self.log.info("Image registered in Docker daemon as %s:%s" % (image_name, image_tag))
 
         # Cleanup the temporary directory
         shutil.rmtree(tmp_dir)

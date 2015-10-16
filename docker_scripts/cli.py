@@ -6,7 +6,7 @@ import sys
 
 from docker_scripts import squash, layers
 from docker_scripts.version import version
-
+from docker_scripts.errors import Error
 
 class MyParser(argparse.ArgumentParser):
 
@@ -84,7 +84,11 @@ class CLI(object):
 
         self.log.debug("Running version %s", version)
 
-        args.func(args)
+        try:
+            args.func(args)
+        except Error as e:
+            self.log.exception(e)
+            sys.exit(1)
 
 
 def run():

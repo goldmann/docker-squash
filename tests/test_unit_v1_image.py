@@ -149,8 +149,9 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
         with mock.patch.object(six.moves.builtins, 'open', mock.mock_open()) as mock_file:
             self.squash._generate_repositories_json(
                 'file', image_id, 'name', 'tag')
-            mock_file().write.assert_called_once_with(
-                '{"name": {"tag": "12323dferwt4awefq23rasf"}}')
+
+            self.assertIn(mock.call().write('{"name":{"tag":"12323dferwt4awefq23rasf"}}'), mock_file.mock_calls)
+            self.assertIn(mock.call().write('\n'), mock_file.mock_calls)
 
     def test_handle_empty_image_id(self):
         with mock.patch.object(six.moves.builtins, 'open', mock.mock_open()) as mock_file:

@@ -39,7 +39,8 @@ class V1Image(Image):
         metadata['parent'] = self.squash_id
         metadata['id'] = image_id
         metadata['Size'] = os.path.getsize(os.path.join(self.squashed_dir, "layer.tar"))
+        json_metadata = self._dump_json(metadata)[0]
 
-        self._write_json_metadata(metadata, os.path.join(self.squashed_dir, "json"))
+        self._write_json_metadata("%s" % json_metadata, os.path.join(self.squashed_dir, "json"))
 
         return image_id

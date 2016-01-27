@@ -1,5 +1,6 @@
 
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -32,7 +33,10 @@ class Image(object):
     This class should not be used directly.
     """
 
-    def __init__(self, log, docker, image, from_layer, tmp_dir, tag = None):
+    FORMAT = None
+    """ Image format version """
+
+    def __init__(self, log, docker, image, from_layer, tmp_dir = None, tag = None):
         self.log = log
         self.docker = docker
         self.image = image
@@ -56,8 +60,10 @@ class Image(object):
 
     def squash(self):
         self._before_squashing()
-        return self._squash()
-#        self._after_squashing()
+        ret = self._squash()
+        self._after_squashing()
+
+        return ret
 
     def _squash(self):
         pass
@@ -151,6 +157,8 @@ class Image(object):
 
         self.log.info("Squashing image '%s'..." % self.image)
 
+    def _after_squashing(self):
+        pass
 
     def layer_paths(self):
         """
@@ -308,6 +316,19 @@ class Image(object):
             image_name = image
 
         return (image_name, image_tag)
+
+    def _dump_json(self, data):
+        """
+        Helper function to marshal object into JSON string.
+        Additionally a sha256sum of the created JSON string is generated.
+        """
+
+        # We do not want any spaces between keys and values in JSON
+        json_data = json.dumps(data, separators=(',', ':'))
+        # Generate sha256sum of the JSON data, may be handy
+        sha = hashlib.sha256(json_data.encode('utf-8')).hexdigest()
+
+        return json_data, sha
 
     def _generate_repositories_json(self, repositories_file, image_id, name, tag):
         if not image_id:

@@ -47,7 +47,8 @@ class V2Image(Image):
         layer_path_id = self._generate_squashed_layer_path_id()
 
         if self.layer_paths_to_squash:
-            metadata = self._generate_last_layer_metadata(layer_path_id, self.layer_paths_to_squash[0])
+            metadata = self._generate_last_layer_metadata(
+                layer_path_id, self.layer_paths_to_squash[0])
             self._write_squashed_layer_metadata(metadata)
 
             # Write version file to the squashed layer
@@ -62,9 +63,12 @@ class V2Image(Image):
         else:
             # Rename last moved layer. Name of this directory should be the
             # calculated layer_path_id
-            metadata = self._generate_last_layer_metadata(layer_path_id, self.layer_paths_to_move[-1])
-            layer_metadata_file = os.path.join(self.new_image_dir, layer_path_id, "json")
-            os.rename(os.path.join(self.old_image_dir, self.layer_paths_to_move[-1]), os.path.join(self.new_image_dir, layer_path_id))
+            metadata = self._generate_last_layer_metadata(
+                layer_path_id, self.layer_paths_to_move[-1])
+            layer_metadata_file = os.path.join(
+                self.new_image_dir, layer_path_id, "json")
+            os.rename(os.path.join(self.old_image_dir, self.layer_paths_to_move[
+                      -1]), os.path.join(self.new_image_dir, layer_path_id))
             json_metadata = self._dump_json(metadata)[0]
             self._write_json_metadata(json_metadata, layer_metadata_file)
 
@@ -74,7 +78,8 @@ class V2Image(Image):
         self._move_layers(layer_paths_actually_to_move,
                           self.old_image_dir, self.new_image_dir)
 
-        manifest = self._generate_manifest_metadata(image_id, self.image_name, self.image_tag, self.old_image_manifest, layer_paths_actually_to_move, layer_path_id)
+        manifest = self._generate_manifest_metadata(
+            image_id, self.image_name, self.image_tag, self.old_image_manifest, layer_paths_actually_to_move, layer_path_id)
         self._write_manifest_metadata(manifest)
 
         repositories_file = os.path.join(self.new_image_dir, "repositories")
@@ -87,8 +92,9 @@ class V2Image(Image):
         # Create JSON from the metadata
         # Docker adds new line at the end
         json_metadata, image_id = self._dump_json(metadata, True)
-        image_metadata_file = os.path.join(self.new_image_dir, "%s.json" % image_id)
-        
+        image_metadata_file = os.path.join(
+            self.new_image_dir, "%s.json" % image_id)
+
         self._write_json_metadata(json_metadata, image_metadata_file)
 
         return image_id
@@ -96,7 +102,7 @@ class V2Image(Image):
     def _write_squashed_layer_metadata(self, metadata):
         layer_metadata_file = os.path.join(self.squashed_dir, "json")
         json_metadata = self._dump_json(metadata)[0]
-        
+
         self._write_json_metadata(json_metadata, layer_metadata_file)
 
     def _write_manifest_metadata(self, manifest):
@@ -232,7 +238,7 @@ class V2Image(Image):
         # The 'parent' element is the name of the directory (inside the
         # exported tar archive) of the last layer that we move
         # (layer below squashed layer)
-        
+
         if self.layer_paths_to_squash:
             parent = self.layer_paths_to_move[-1]
         else:
@@ -249,7 +255,7 @@ class V2Image(Image):
 
         return sha
 
-    def _generate_last_layer_metadata(self, layer_path_id, old_layer_path = None):
+    def _generate_last_layer_metadata(self, layer_path_id, old_layer_path=None):
         if not old_layer_path:
             old_layer_path = layer_path_id
 

@@ -8,6 +8,7 @@ from docker_scripts import squash, layers
 from docker_scripts.version import version
 from docker_scripts.errors import Error
 
+
 class MyParser(argparse.ArgumentParser):
 
     def error(self, message):

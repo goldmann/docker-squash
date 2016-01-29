@@ -11,6 +11,7 @@ import tempfile
 
 from docker_scripts.errors import SquashError
 
+
 class Chdir(object):
 
     """ Context manager for changing the current working directory """
@@ -25,6 +26,7 @@ class Chdir(object):
     def __exit__(self, etype, value, traceback):
         os.chdir(self.savedPath)
 
+
 class Image(object):
     """
     Base class for all Docker image formats. Contains many functions that are handy
@@ -36,7 +38,7 @@ class Image(object):
     FORMAT = None
     """ Image format version """
 
-    def __init__(self, log, docker, image, from_layer, tmp_dir = None, tag = None):
+    def __init__(self, log, docker, image, from_layer, tmp_dir=None, tag=None):
         self.log = log
         self.docker = docker
         self.image = image
@@ -52,7 +54,8 @@ class Image(object):
         # We need to produce same output as Docker's to not generate
         # different metadata. That's why we need to strip all zeros at the
         # end of the date string...
-        self.date = re.sub(r'0*Z$', 'Z', datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ'))
+        self.date = re.sub(
+            r'0*Z$', 'Z', datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ'))
         """ Date used in metadata, already formatted using the `%Y-%m-%dT%H:%M:%S.%fZ` format """
 
         self.tmp_dir = tmp_dir
@@ -99,7 +102,6 @@ class Image(object):
 
         self.image_name, self.image_tag = self._parse_image_name(self.tag)
 
-
         # The image id or name of the image to be squashed
         try:
             self.old_image_id = self.docker.inspect_image(self.image)['Id']
@@ -113,7 +115,7 @@ class Image(object):
         self._read_layers(self.old_image_layers, self.old_image_id)
 
         self.old_image_layers.reverse()
-        
+
         # The id or name of the layer/image that the squashing should begin from
         # This layer WILL NOT be squashed, but all next layers will
         if self.from_layer:
@@ -146,7 +148,8 @@ class Image(object):
             return
 
         self.log.info("Attempting to squash from layer %s...", self.squash_id)
-        self.log.info("We have %s layers to squash", len(self.layers_to_squash))
+        self.log.info("We have %s layers to squash",
+                      len(self.layers_to_squash))
         self.log.debug("Layers to squash: %s", self.layers_to_squash)
 
         # Save the image in tar format in the tepmorary directory
@@ -165,7 +168,7 @@ class Image(object):
         Returns name of directories to layers in the exported tar archive.
         """
         pass
-   
+
     def unpack_image(self):
         """
         Unpacks old image.
@@ -177,7 +180,8 @@ class Image(object):
 
     def load_squashed_image(self):
         self._load_image(self.new_image_dir)
-        self.log.info("Image registered in Docker daemon as %s:%s" % (self.image_name, self.image_tag))
+        self.log.info("Image registered in Docker daemon as %s:%s" %
+                      (self.image_name, self.image_tag))
 
     def _files_in_layers(self, layers, directory):
         """
@@ -207,7 +211,7 @@ class Image(object):
         self.log.debug("Using %s as the temporary directory" % tmp_dir)
 
         return tmp_dir
-    
+
     def _load_image(self, directory):
         buf = six.BytesIO()
 
@@ -237,7 +241,7 @@ class Image(object):
                 for f in os.listdir("."):
                     tar.add(f)
             self.log.debug("Archive generated")
-    
+
     def _layers_to_squash(self, layers, from_layer):
         """ Prepares a list of layer IDs that should be squashed """
         to_squash = []
@@ -295,7 +299,7 @@ class Image(object):
         os.remove(tar_file)
 
         self.log.info("Archive unpacked!")
-    
+
     def _read_layers(self, layers, image_id):
         """ Reads the JSON metadata for specified layer / image id """
 
@@ -317,7 +321,7 @@ class Image(object):
 
         return (image_name, image_tag)
 
-    def _dump_json(self, data, new_line = False):
+    def _dump_json(self, data, new_line=False):
         """
         Helper function to marshal object into JSON string.
         Additionally a sha256sum of the created JSON string is generated.
@@ -475,7 +479,8 @@ class Image(object):
             missed_markers = {}
 
             for layer_id in layers_to_squash:
-                layer_tar_file = os.path.join(self.old_image_dir, layer_id, "layer.tar")
+                layer_tar_file = os.path.join(
+                    self.old_image_dir, layer_id, "layer.tar")
 
                 self.log.info("Squashing file '%s'..." % layer_tar_file)
 

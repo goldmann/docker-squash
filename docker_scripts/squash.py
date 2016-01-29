@@ -21,6 +21,7 @@ from docker_scripts.version import version
 if not six.PY3:
     import lib.xtarfile
 
+
 class Squash(object):
 
     def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None,
@@ -37,25 +38,29 @@ class Squash(object):
         if not docker:
             self.docker = common.docker_client()
 
-
     def run(self):
         docker_version = self.docker.version()
-        self.log.info("docker-scripts version %s, Docker %s, API %s..." % (version, docker_version['GitCommit'], docker_version['ApiVersion']))
+        self.log.info("docker-scripts version %s, Docker %s, API %s..." %
+                      (version, docker_version['GitCommit'], docker_version['ApiVersion']))
 
         if self.image is None:
             raise SquashError("Image is not provided")
 
         if not (self.output_path or self.load_image):
-            self.log.warn("No output path specified and loading into Docker is not selected either; squashed image would not accessible, proceeding with squashing doesn't make sense")
+            self.log.warn(
+                "No output path specified and loading into Docker is not selected either; squashed image would not accessible, proceeding with squashing doesn't make sense")
             return
 
         if self.output_path and os.path.exists(self.output_path):
-            self.log.warn("Path '%s' specified as output path where the squashed image should be saved already exists, it'll be overriden" % self.output_path)
+            self.log.warn(
+                "Path '%s' specified as output path where the squashed image should be saved already exists, it'll be overriden" % self.output_path)
 
         if StrictVersion(docker_version['ApiVersion']) >= StrictVersion("1.22"):
-            image = V2Image(self.log, self.docker, self.image, self.from_layer, self.tmp_dir, self.tag)
+            image = V2Image(self.log, self.docker, self.image,
+                            self.from_layer, self.tmp_dir, self.tag)
         else:
-            image = V1Image(self.log, self.docker, self.image, self.from_layer, self.tmp_dir, self.tag)
+            image = V1Image(self.log, self.docker, self.image,
+                            self.from_layer, self.tmp_dir, self.tag)
 
         self.log.info("Using %s image format" % image.FORMAT)
 
@@ -73,7 +78,7 @@ class Squash(object):
             # Load squashed image into Docker
             image.load_squashed_image()
 
-        #image.cleanup()
+        # image.cleanup()
 
         self.log.info("Done")
 

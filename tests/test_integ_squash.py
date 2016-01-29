@@ -470,6 +470,20 @@ class TestIntegSquash(unittest.TestCase):
                 with self.assertRaisesRegexp(KeyError, "'size'"):
                     self.assertEqual(image.metadata['size'], None)
 
+    def test_handle_correctly_squashing_layers_without_data(self):
+        dockerfile = '''
+        FROM %s
+        ENV a=1
+        ENV b=2
+        ENV c=3
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2) as squashed_image:
+                    # We should have two layers less in the image
+                    self.assertTrue(
+                        len(squashed_image.layers) == len(image.layers) - 2)
+
     @unittest.skip("need to add support for v1 and v2")
     def test_load_image_produces_file_and_engine_image(self):
         dockerfile = '''

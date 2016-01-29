@@ -86,7 +86,7 @@ class Image(object):
         self.squashed_dir = os.path.join(self.new_image_dir, "squashed")
         """ Temporary location on the disk of the squashed *layer* """
 
-        for d in self.old_image_dir, self.new_image_dir, self.squashed_dir:
+        for d in self.old_image_dir, self.new_image_dir:
             os.makedirs(d)
 
     def _before_squashing(self):
@@ -317,7 +317,7 @@ class Image(object):
 
         return (image_name, image_tag)
 
-    def _dump_json(self, data):
+    def _dump_json(self, data, new_line = False):
         """
         Helper function to marshal object into JSON string.
         Additionally a sha256sum of the created JSON string is generated.
@@ -325,6 +325,10 @@ class Image(object):
 
         # We do not want any spaces between keys and values in JSON
         json_data = json.dumps(data, separators=(',', ':'))
+
+        if new_line:
+            json_data = "%s\n" % json_data
+
         # Generate sha256sum of the JSON data, may be handy
         sha = hashlib.sha256(json_data.encode('utf-8')).hexdigest()
 
@@ -351,7 +355,6 @@ class Image(object):
             f.write("1.0")
 
     def _write_json_metadata(self, metadata, metadata_file):
-
         with open(metadata_file, 'w') as f:
             f.write(metadata)
 

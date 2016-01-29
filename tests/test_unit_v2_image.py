@@ -5,6 +5,7 @@ import tarfile
 
 from collections import OrderedDict
 from docker_scripts.v2_image import V2Image
+from docker_scripts.image import Image
 from docker_scripts.errors import SquashError
 
 
@@ -64,6 +65,7 @@ class TestGeneratingMetadata(unittest.TestCase):
         self.image.old_image_dir = "/tmp/old"
         self.image.squash_id = "squash_id"
         self.image.date = "squashed_date"
+        self.image.diff_ids = ['diffid_1', 'diffid_2']
         # We want to move 3 layers (including empty)
         self.image.layers_to_move = ["lauer_id_1", "layer_id_2", "layer_id_3"]
         # We want to move 2 layers with content
@@ -74,20 +76,19 @@ class TestGeneratingMetadata(unittest.TestCase):
         self.image.old_image_config = OrderedDict({'config': {'Image': 'some_id'}, 'container': 'container_id', 'created': 'old_date', 'history': [
             {'created': 'date1'}, {'created': 'date2'}, {'created': 'date3'}, {'created': 'date4'}], 'rootfs': {'diff_ids': ['sha256:a', 'sha256:b', 'sha256:c']}})
 
-        with mock.patch.object(V2Image, '_new_diff_ids', return_value=['diffid_1', 'diffid_2']) as mock_method:
-            metadata = self.image._generate_image_metadata()
+        metadata = self.image._generate_image_metadata()
 
-            self.assertEqual(type(metadata), OrderedDict)
-            self.assertEqual(metadata['created'], "squashed_date")
-            self.assertEqual(metadata['config']['Image'], "squash_id")
-            # 2 layer data's from moved layers + 1 layer data from squashed
-            # layer
-            self.assertEqual(metadata['rootfs']['diff_ids'], [
-                             'sha256:a', u'sha256:b', 'sha256:diffid_2'])
-            # 3 moved layers + 1 squashed layer in history
-            self.assertEqual(metadata['history'],
-                             [{'created': 'date1'}, {'created': 'date2'}, {'created': 'date3'}, {'comment': '', 'created': 'squashed_date'}])
-            self.assertEqual(metadata.pop('container', None), None)
+        self.assertEqual(type(metadata), OrderedDict)
+        self.assertEqual(metadata['created'], "squashed_date")
+        self.assertEqual(metadata['config']['Image'], "squash_id")
+        # 2 layer data's from moved layers + 1 layer data from squashed
+        # layer
+        self.assertEqual(metadata['rootfs']['diff_ids'], [
+                         'sha256:a', u'sha256:b', 'sha256:diffid_2'])
+        # 3 moved layers + 1 squashed layer in history
+        self.assertEqual(metadata['history'],
+                         [{'created': 'date1'}, {'created': 'date2'}, {'created': 'date3'}, {'comment': '', 'created': 'squashed_date'}])
+        self.assertEqual(metadata.pop('container', None), None)
 
     def test_generate_squashed_layer_metadata(self):
         self.image.date = "squashed_date"
@@ -126,6 +127,38 @@ class TestGeneratingMetadata(unittest.TestCase):
 
         self.assertEqual(self.image._generate_squashed_layer_path_id(
         ), "2c52e8c273e5169fcca086c5a35ae2244cf4a561bd7323f65577109a3489a2e3")
+
+class TestWritingMetadata(unittest.TestCase):
+
+    def setUp(self):
+        self.docker_client = mock.Mock()
+        self.log = mock.Mock()
+        self.image = "whatever"
+        self.image = V2Image(self.log, self.docker_client, self.image, None)
+
+    @mock.patch.object(V2Image, '_write_json_metadata')
+    def test_write_image_metadata(self, mock_method):
+        self.image.new_image_dir = "/tmp/new"
+        metadata = OrderedDict([('a', 'something'), ('b', 12)])
+        image_id = self.image._write_image_metadata(metadata)
+
+        mock_method.assert_called_with('{"a":"something","b":12}\n', '/tmp/new/b3a8bc9dad2103f11e99ebc5ce113c08d1dc31299c247ddd87aca1f048560db3.json')
+
+        self.assertEqual(image_id, 'b3a8bc9dad2103f11e99ebc5ce113c08d1dc31299c247ddd87aca1f048560db3')
+
+    @mock.patch.object(V2Image, '_write_json_metadata')
+    def test_write_squashed_layer_metadata(self, mock_method):
+        self.image.squashed_dir = "/tmp/squashed"
+        metadata = OrderedDict([('a', 'something'), ('b', 12)])
+        self.image._write_squashed_layer_metadata(metadata)
+        mock_method.assert_called_with('{"a":"something","b":12}', '/tmp/squashed/json')
+
+    @mock.patch.object(V2Image, '_write_json_metadata')
+    def test_write_manifest_metadata(self, mock_method):
+        self.image.new_image_dir = "/tmp/new"
+        metadata = OrderedDict([('a', 'something'), ('b', 12)])
+        self.image._write_manifest_metadata(metadata)
+        mock_method.assert_called_with('{"a":"something","b":12}\n', '/tmp/new/manifest.json')
 
 if __name__ == '__main__':
     unittest.main()

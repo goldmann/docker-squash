@@ -10,7 +10,6 @@ from docker_scripts.image import Image
 
 class V2Image(Image):
     FORMAT = 'v2'
-    """ Image format version """
 
     def _before_squashing(self):
         super(V2Image, self)._before_squashing()
@@ -33,7 +32,6 @@ class V2Image(Image):
         if self.layer_paths_to_squash:
             # Prepare the directory
             os.makedirs(self.squashed_dir)
-
             # Merge data layers
             self._squash_layers(self.layer_paths_to_squash,
                                 self.layer_paths_to_move)
@@ -43,7 +41,6 @@ class V2Image(Image):
 
         metadata = self._generate_image_metadata()
         image_id = self._write_image_metadata(metadata)
-
 
         # Compute layer id to use to name the directory where
         # we store the layer data inside of the tar archive
@@ -62,7 +59,6 @@ class V2Image(Image):
                 self.new_image_dir, layer_path_id))
 
             layer_paths_actually_to_move = self.layer_paths_to_move
-
         else:
             # Rename last moved layer. Name of this directory should be the
             # calculated layer_path_id
@@ -259,7 +255,6 @@ class V2Image(Image):
 
         config_file = os.path.join(
             self.old_image_dir, old_layer_path, "json")
-#            self.old_image_dir, self.layer_paths_to_squash[0], "json")
 
         with open(config_file, 'r') as f:
             config = json.load(f, object_pairs_hook=OrderedDict)
@@ -272,20 +267,6 @@ class V2Image(Image):
         config['id'] = layer_path_id
         del config['container']
         return config
-
-    def _update_moved_layer_metadata(self, layer_path_id):
-        config_file = os.path.join(
-            self.new_image_dir, layer_path_id, "json")
-
-        with open(config_file, 'r') as f:
-            config = json.load(f, object_pairs_hook=OrderedDict)
-
-        config['config']['Image'] = self.squash_id
-        config['id'] = layer_path_id
-        config['created'] = self.date
-        del config['container']
-        return config
-
 
     def _generate_image_metadata(self):
         # First - read old image config, we'll update it instead of

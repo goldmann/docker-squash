@@ -20,6 +20,8 @@ class V1Image(Image):
                 return image_id
 
     def _squash(self):
+        # Prepare the directory
+        os.makedirs(self.squashed_dir)
         self._squash_layers(self.layers_to_squash, self.layers_to_move)
         self._write_version_file(self.squashed_dir)
         # Move all the layers that should be untouched

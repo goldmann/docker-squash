@@ -70,6 +70,33 @@ class TestGeneratingMetadata(unittest.TestCase):
         self.image.layers_to_move = ["lauer_id_1", "layer_id_2", "layer_id_3"]
         # We want to move 2 layers with content
         self.image.layer_paths_to_move = ["layer_path_1", "layer_path_2"]
+        self.image.layer_paths_to_squash = []
+        # Image that contains:
+        # - 4 layers
+        # - 3 layers that have content
+        self.image.old_image_config = OrderedDict({'config': {'Image': 'some_id'}, 'container': 'container_id', 'created': 'old_date', 'history': [
+            {'created': 'date1'}, {'created': 'date2'}, {'created': 'date3'}, {'created': 'date4'}], 'rootfs': {'diff_ids': ['sha256:a', 'sha256:b', 'sha256:c']}})
+
+        metadata = self.image._generate_image_metadata()
+
+        self.assertEqual(type(metadata), OrderedDict)
+        # 2 layer data's from moved layers, no squashed layer
+        self.assertEqual(metadata['rootfs']['diff_ids'], [
+                         'sha256:a', u'sha256:b'])
+        # 3 moved layers, no squashed layer
+        self.assertEqual(metadata['history'],
+                         [{'created': 'date1'}, {'created': 'date2'}, {'created': 'date3'}])
+
+    def test_generate_image_metadata_without_any_layers_to_squash(self):
+        self.image.old_image_dir = "/tmp/old"
+        self.image.squash_id = "squash_id"
+        self.image.date = "squashed_date"
+        self.image.diff_ids = ['diffid_1', 'diffid_2']
+        # We want to move 3 layers (including empty)
+        self.image.layers_to_move = ["lauer_id_1", "layer_id_2", "layer_id_3"]
+        # We want to move 2 layers with content
+        self.image.layer_paths_to_move = ["layer_path_1", "layer_path_2"]
+        self.image.layer_paths_to_squash = ["layer_path_3", "layer_path_4"]
         # Image that contains:
         # - 4 layers
         # - 3 layers that have content
@@ -100,7 +127,7 @@ class TestGeneratingMetadata(unittest.TestCase):
         layer_config = '{"created": "old_created", "config": {"Image": "old_id"}, "container": "container_id"}'
 
         with mock.patch.object(six.moves.builtins, 'open', mock.mock_open(read_data=layer_config)) as mock_file:
-            metadata = self.image._generate_squashed_layer_metadata(
+            metadata = self.image._generate_last_layer_metadata(
                 "squashed_layer_path_id")
 
             self.assertEqual(type(metadata), OrderedDict)

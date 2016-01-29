@@ -19,12 +19,19 @@ from docker_scripts.errors import SquashError
 if not six.PY3:
     import docker_scripts.lib.xtarfile
 
+class ImageHelper(object):
+    @staticmethod
+    def top_layer_path(tar):
+        #tar_object.seek(0)
+        repositories_member = tar.getmember('repositories')
+        reader = codecs.getreader("utf-8")
+        repositories = json.load(reader(tar.extractfile(repositories_member)))
+        return repositories.popitem()[1].popitem()[1]
 
 class TestIntegSquash(unittest.TestCase):
 
     BUSYBOX_IMAGE = "busybox:1.24"
 
-#    docker = docker.Client(version='1.16')
     # Default base url for the connection
     base_url = os.getenv('DOCKER_CONNECTION', 'unix://var/run/docker.sock')
     docker = docker.AutoVersionClient(base_url=base_url)
@@ -56,12 +63,26 @@ class TestIntegSquash(unittest.TestCase):
             self.history = self.docker.history(self.tag)
             self.layers = [o['Id'] for o in self.history]
             self.metadata = self.docker.inspect_image(self.tag)
+            self.tar = self._save_image()
+
+            with tarfile.open(fileobj=self.tar, mode='r') as tar:
+                self.tarnames = tar.getnames()
 
             return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):
             if not os.getenv('CI'):
                 self.docker.remove_image(image=self.tag, force=True)
+
+        # Duplicated, I know...
+        def _save_image(self):
+            image = self.docker.get_image(self.tag)
+
+            buf = io.BytesIO()
+            buf.write(image.data)
+            buf.seek(0)  # Rewind
+
+            return buf
 
     class SquashedImage(object):
 
@@ -83,10 +104,16 @@ class TestIntegSquash(unittest.TestCase):
                 output_path=self.output_path, load_image=self.load_image)
             self.image_id = squash.run()
 
+            self.tar = self._save_image()
+
+            with tarfile.open(fileobj=self.tar, mode='r') as tar:
+                self.tarnames = tar.getnames()
+
             if not self.output_path or self.load_image:
                 self.squashed_layer = self._squashed_layer()
                 self.layers = [o['Id'] for o in self.docker.history(self.tag)]
                 self.metadata = self.docker.inspect_image(self.tag)
+
 
             return self
 
@@ -110,19 +137,10 @@ class TestIntegSquash(unittest.TestCase):
                 return tar.extractfile(member)
 
         def _squashed_layer(self):
-            image = self._save_image()
-
-            with tarfile.open(fileobj=image, mode='r') as tar:
-                if 'manifest.json' in tar.getnames():
-                    # This is the v2 format, we need to find squashed layer first
-                    manifest_member = tar.getmember('manifest.json')
-                    reader = codecs.getreader("utf-8")
-                    manifest = json.load(reader(tar.extractfile(manifest_member)))
-                    self.squashed_layer_path = manifest[0]['Layers'][-1].split('/')[0]
-                else:
-                    self.squashed_layer_path = self.docker.inspect_image(self.tag)['Id']
-
-            return self._extract_file("%s/layer.tar" % self.squashed_layer_path, image)
+            self.tar.seek(0)
+            with tarfile.open(fileobj=self.tar, mode='r') as tar:
+                self.squashed_layer_path = ImageHelper.top_layer_path(tar)
+            return self._extract_file("%s/layer.tar" % self.squashed_layer_path, self.tar)
 
         def assertFileExists(self, name):
             self.squashed_layer.seek(0)  # Rewind
@@ -433,8 +451,6 @@ class TestIntegSquash(unittest.TestCase):
                         self.assertFalse(name.startswith('.'))
 
     # https://github.com/goldmann/docker-scripts/issues/32
-    # TODO: this test needs to be rewritten!
-    @unittest.skip("need to add support for v1 and v2")
     def test_version_file_exists_in_squashed_layer(self):
         dockerfile = '''
         FROM %s
@@ -445,10 +461,7 @@ class TestIntegSquash(unittest.TestCase):
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2, output_path="image.tar") as squashed_image:
                 with tarfile.open("image.tar", mode='r') as tar:
-                    # TODO: Clean up this mess
-                    manifest_member = tar.getmember('manifest.json')
-                    manifest = json.load(tar.extractfile(manifest_member))
-                    squashed_layer_path = manifest[0]['Layers'][-1].split('/')[0]
+                    squashed_layer_path = ImageHelper.top_layer_path(tar)
                     
                     all_files = tar.getnames()
 
@@ -480,11 +493,26 @@ class TestIntegSquash(unittest.TestCase):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2) as squashed_image:
-                    # We should have two layers less in the image
-                    self.assertTrue(
-                        len(squashed_image.layers) == len(image.layers) - 2)
+                image_data_layers = [s for s in image.tarnames if "layer.tar" in s]
+                squashed_image_data_layers = [s for s in squashed_image.tarnames if "layer.tar" in s]
 
-    @unittest.skip("need to add support for v1 and v2")
+                if 'manifest.json' in image.tarnames:
+                    # For v2
+                    # For V2 only layers with data contain layer.tar archives
+                    # In our test case we did not add any data, so the count should
+                    # be the same
+                    self.assertEqual(len(image_data_layers), len(squashed_image_data_layers))
+                    # In v2 we squashed 2 empty layers, so no new squashed layer was added
+                    self.assertEqual(len(image.layers), len(squashed_image.layers) + 2)
+                else:
+                    # For v1
+                    # V1 image contains as many layer.tar archives as the image has layers
+                    # We squashed 2 layers, so squashed image contains one layer less
+                    self.assertEqual(len(image_data_layers), len(squashed_image_data_layers) + 1)
+                    # In v1 we squashed 2 layers into one, so only one layer was removed
+                    self.assertEqual(len(image.layers), len(squashed_image.layers) + 1)
+
+
     def test_load_image_produces_file_and_engine_image(self):
         dockerfile = '''
         FROM %s
@@ -497,10 +525,7 @@ class TestIntegSquash(unittest.TestCase):
                     as squashed_image:
                 # first, make sure that the exported image exists and is ok
                 with tarfile.open("image.tar", mode='r') as tar:
-                    # TODO: Clean up this mess
-                    manifest_member = tar.getmember('manifest.json')
-                    manifest = json.load(tar.extractfile(manifest_member))
-                    squashed_layer_path = manifest[0]['Layers'][-1].split('/')[0]
+                    squashed_layer_path = ImageHelper.top_layer_path(tar)
                     
                     all_files = tar.getnames()
 

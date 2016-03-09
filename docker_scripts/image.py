@@ -143,9 +143,7 @@ class Image(object):
         self.log.info("Checking if squashing is necessary...")
 
         if len(self.layers_to_squash) <= 1:
-            self.log.warning(
-                "%s layer(s) in this image marked to squash, no squashing is required" % len(self.layers_to_squash))
-            return
+            raise SquashError("%s layer(s) in this image marked to squash, no squashing is required" % len(self.layers_to_squash))
 
         self.log.info("Attempting to squash from layer %s...", self.squash_id)
         self.log.info("We have %s layers to squash",

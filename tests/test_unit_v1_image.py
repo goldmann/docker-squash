@@ -3,7 +3,9 @@ import mock
 import six
 import tarfile
 
+from docker_scripts.squash import Squash
 from docker_scripts.image import Image
+from docker_scripts.v1_image import V1Image
 from docker_scripts.errors import SquashError
 
 
@@ -108,14 +110,13 @@ class TestPrepareLayersToSquash(unittest.TestCase):
         self.assertEquals(self.squash._layers_to_squash(
             ['abc', 'def', 'ghi', 'jkl'], 'asdasdasd'), (['abc', 'def', 'ghi', 'jkl'], []))
 
-@unittest.skip("should be moved to v1 tests")
-class TestGenerateImageId(unittest.TestCase):
+class TestGenerateV1ImageId(unittest.TestCase):
 
     def setUp(self):
         self.docker_client = mock.Mock()
         self.log = mock.Mock()
         self.image = "whatever"
-        self.squash = Image(self.log, self.docker_client, self.image, None)
+        self.squash = V1Image(self.log, self.docker_client, self.image, None)
 
     def test_should_generate_id(self):
         image_id = self.squash._generate_image_id()
@@ -269,7 +270,6 @@ class TestAddMarkers(unittest.TestCase):
 
         self.assertTrue(len(tar.addfile.mock_calls) == 0)
 
-@unittest.skip("Should be moved to squash tests")
 class TestGeneral(unittest.TestCase):
 
     def setUp(self):

@@ -61,7 +61,7 @@ class TestGeneratingMetadata(unittest.TestCase):
         self.assertEqual(metadata['Layers'], [
                          "layer_a/layer.tar", "layer_b/layer.tar", "this_is_layer_path_id/layer.tar"])
 
-    def test_generate_image_metadata(self):
+    def test_generate_image_metadata_without_any_layers_to_squash(self):
         self.image.old_image_dir = "/tmp/old"
         self.image.squash_id = "squash_id"
         self.image.date = "squashed_date"
@@ -87,7 +87,7 @@ class TestGeneratingMetadata(unittest.TestCase):
         self.assertEqual(metadata['history'],
                          [{'created': 'date1'}, {'created': 'date2'}, {'created': 'date3'}])
 
-    def test_generate_image_metadata_without_any_layers_to_squash(self):
+    def test_generate_image_metadata(self):
         self.image.old_image_dir = "/tmp/old"
         self.image.squash_id = "squash_id"
         self.image.date = "squashed_date"

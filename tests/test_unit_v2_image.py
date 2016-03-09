@@ -61,13 +61,13 @@ class TestGeneratingMetadata(unittest.TestCase):
         self.assertEqual(metadata['Layers'], [
                          "layer_a/layer.tar", "layer_b/layer.tar", "this_is_layer_path_id/layer.tar"])
 
-    def test_generate_image_metadata(self):
+    def test_generate_image_metadata_without_any_layers_to_squash(self):
         self.image.old_image_dir = "/tmp/old"
         self.image.squash_id = "squash_id"
         self.image.date = "squashed_date"
         self.image.diff_ids = ['diffid_1', 'diffid_2']
         # We want to move 3 layers (including empty)
-        self.image.layers_to_move = ["lauer_id_1", "layer_id_2", "layer_id_3"]
+        self.image.layers_to_move = ["layer_id_1", "layer_id_2", "layer_id_3"]
         # We want to move 2 layers with content
         self.image.layer_paths_to_move = ["layer_path_1", "layer_path_2"]
         self.image.layer_paths_to_squash = []
@@ -83,11 +83,11 @@ class TestGeneratingMetadata(unittest.TestCase):
         # 2 layer data's from moved layers, no squashed layer
         self.assertEqual(metadata['rootfs']['diff_ids'], [
                          'sha256:a', u'sha256:b'])
-        # 3 moved layers, no squashed layer
+        # 3 moved layers + squashed layer info
         self.assertEqual(metadata['history'],
-                         [{'created': 'date1'}, {'created': 'date2'}, {'created': 'date3'}])
+                [{'created': 'date1'}, {'created': 'date2'}, {'created': 'date3'}, {'comment': '', 'created': 'squashed_date', 'empty_layer': True}])
 
-    def test_generate_image_metadata_without_any_layers_to_squash(self):
+    def test_generate_image_metadata(self):
         self.image.old_image_dir = "/tmp/old"
         self.image.squash_id = "squash_id"
         self.image.date = "squashed_date"

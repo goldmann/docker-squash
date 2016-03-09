@@ -23,10 +23,16 @@ class ImageHelper(object):
     @staticmethod
     def top_layer_path(tar):
         #tar_object.seek(0)
-        repositories_member = tar.getmember('repositories')
         reader = codecs.getreader("utf-8")
-        repositories = json.load(reader(tar.extractfile(repositories_member)))
-        return repositories.popitem()[1].popitem()[1]
+
+        if 'repositories' in tar.getnames():
+            repositories_member = tar.getmember('repositories')
+            repositories = json.load(reader(tar.extractfile(repositories_member)))
+            return repositories.popitem()[1].popitem()[1]
+        else:
+            manifest_member = tar.getmember('manifest.json')
+            manifest = json.load(reader(tar.extractfile(manifest_member)))
+            return manifest[0]["Layers"][-1].split("/")[0]
 
 class TestIntegSquash(unittest.TestCase):
 
@@ -503,7 +509,7 @@ class TestIntegSquash(unittest.TestCase):
                     # be the same
                     self.assertEqual(len(image_data_layers), len(squashed_image_data_layers))
                     # In v2 we squashed 2 empty layers, so no new squashed layer was added
-                    self.assertEqual(len(image.layers), len(squashed_image.layers) + 2)
+                    self.assertEqual(len(image.layers), len(squashed_image.layers) + 1)
                 else:
                     # For v1
                     # V1 image contains as many layer.tar archives as the image has layers
@@ -535,6 +541,49 @@ class TestIntegSquash(unittest.TestCase):
                     
                 # then also make sure that the image loaded back exists and is ok
                 self.assertIsInstance(image.metadata['Size'], int)
+
+    # This is an edge case where we try to squash last 2 layers
+    # but these layers do not create any content on filesystem
+    # https://github.com/goldmann/docker-scripts/issues/54
+    def test_should_squash_exactly_2_layers_without_data(self):
+        dockerfile = '''
+        FROM %s
+        CMD /bin/env
+        LABEL foo bar
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2) as squashed_image:
+                self.assertEqual(
+                    len(squashed_image.layers), len(image.layers) - 1)
+
+    def test_should_squash_exactly_3_layers_with_data(self):
+        dockerfile = '''
+        FROM %s
+        RUN touch /abc
+        CMD /bin/env
+        LABEL foo bar
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 3) as squashed_image:
+                self.assertEqual(
+                    len(squashed_image.layers), len(image.layers) - 2)
+
+    def test_should_not_squash_if_only_one_layer_is_to_squash(self):
+        dockerfile = '''
+        FROM %s
+        RUN touch /abc
+        CMD /bin/env
+        LABEL foo bar
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.assertRaises(SquashError) as cm:
+                with self.SquashedImage(image, 1) as squashed_image:
+                    pass
+
+        self.assertEquals(str(cm.exception), '1 layer(s) in this image marked to squash, no squashing is required')
 
 if __name__ == '__main__':
     unittest.main()

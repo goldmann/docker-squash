@@ -4,7 +4,7 @@ general:
 
 machine:
   pre:
-    - curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
+    - make -f docker-scripts/Makefile ci-install-docker
   python:
   services:
     - docker
@@ -18,7 +18,9 @@ dependencies:
 
 test:
   override:
-    - case $CIRCLE_NODE_INDEX in 0) make test-py27 ;; 1) make test-py34 ;; esac:
+    - make test-py27:
+        parallel: true
+    - make test-py34:
         parallel: true
   post:
     - make ci-publish-junit

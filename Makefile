@@ -1,3 +1,5 @@
+CIRCLE_NODE_INDEX ?= 0
+
 test: prepare
 	tox -- tests
 
@@ -12,6 +14,16 @@ test-unit: prepare
 
 test-integ: prepare
 	tox -- tests/test_integ*
+
+ci-install-docker:
+ifeq ($(CIRCLE_NODE_INDEX),0)
+	@echo "Installing Docker 1.10"
+	@curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
+else
+	@echo "Installing Docker 1.9.1"
+	@sudo curl -L -o /usr/bin/docker https://s3-external-1.amazonaws.com/circle-downloads/docker-1.9.1-circleci
+	@sudo chmod +x /usr/bin/docker
+endif
 
 ci-publish-junit:
 	@mkdir -p ${CIRCLE_TEST_REPORTS}

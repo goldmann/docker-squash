@@ -92,6 +92,44 @@ class Image(object):
         for d in self.old_image_dir, self.new_image_dir:
             os.makedirs(d)
 
+    def _number_of_layers(self):
+        try:
+            number_of_layers = int(self.from_layer)
+
+            if number_of_layers <= 0:
+                raise SquashError("Number of layers to squash cannot be less or equal 0, provided: %s" % number_of_layers)
+        except ValueError:
+            number_of_layers = None
+
+        # Do not squash if provided number of layer to squash is bigger
+        # than number of actual layers in the image
+        if number_of_layers:
+            if number_of_layers > len(self.old_image_layers):
+                raise SquashError(
+                    "Cannot squash %s layers, the %s image contains only %s layers" % (number_of_layers, self.image, len(self.old_image_layers)))
+
+        return number_of_layers
+
+    def _from_layer(self):
+        # The id or name of the layer/image that the squashing should begin from
+        # This layer WILL NOT be squashed, but all next layers will
+        if self.from_layer:
+            from_layer = self.from_layer
+        else:
+            from_layer = self.old_image_layers[0]
+
+        try:
+            squash_id = self.docker.inspect_image(from_layer)['Id']
+        except:
+            raise SquashError(
+                "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % from_layer)
+
+        if not squash_id in self.old_image_layers:
+            raise SquashError("Couldn't find the provided layer (%s) in the %s image" % (
+                self.from_layer, self.image))
+
+        return squash_id
+
     def _before_squashing(self):
         self._initialize_directories()
 
@@ -116,53 +154,34 @@ class Image(object):
 
         self.old_image_layers.reverse()
 
-        try:
-            number_of_layers = int(self.from_layer)
-
-            if number_of_layers <= 0:
-                raise SquashError("Number of layers to squash cannot be less or equal 0, provided: %s" % number_of_layers)
-        except ValueError:
-            number_of_layers = None
-
-        # Do not squash if provided number of layer to squash is bigger
-        # than number of actual layers in the image
-        if number_of_layers:
-            if number_of_layers > len(self.old_image_layers):
-                raise SquashError(
-                    "Cannot squash %s layers, the %s image contains only %s layers" % (number_of_layers, self.image, len(self.old_image_layers)))
-
-        # The id or name of the layer/image that the squashing should begin from
-        # This layer WILL NOT be squashed, but all next layers will
-        if self.from_layer:
-            from_layer = self.from_layer
-        else:
-            from_layer = self.old_image_layers[0]
-
-        try:
-            self.squash_id = self.docker.inspect_image(from_layer)['Id']
-        except:
-            raise SquashError(
-                "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % from_layer)
-
         self.log.info("Old image has %s layers", len(self.old_image_layers))
         self.log.debug("Old layers: %s", self.old_image_layers)
 
-        if not self.squash_id in self.old_image_layers:
-            raise SquashError("Couldn't find the provided layer (%s) in the %s image" % (
-                self.from_layer, self.image))
+        self.squash_number = self._number_of_layers()
 
-        # Find the layers to squash and to move
-        self.layers_to_squash, self.layers_to_move = self._layers_to_squash(
-            self.old_image_layers, self.squash_id)
+        if self.squash_number:
+            self.layers_to_squash = self.old_image_layers[self.squash_number:]
+            self.layers_to_move = self.old_image_layers[:self.squash_number]
+        else:
+            self.squash_id = self._from_layer()
+
+            # Find the layers to squash and to move
+            self.layers_to_squash, self.layers_to_move = self._layers_to_squash(
+                self.old_image_layers, self.squash_id)
 
         self.log.info("Checking if squashing is necessary...")
 
         if len(self.layers_to_squash) <= 1:
             raise SquashError("%s layer(s) in this image marked to squash, no squashing is required" % len(self.layers_to_squash))
 
-        self.log.info("Attempting to squash from layer %s...", self.squash_id)
-        self.log.info("We have %s layers to squash",
-                      len(self.layers_to_squash))
+        if self.squash_number:
+            self.log.info("Attempting to squash last %s layers...", self.squash_number)
+        else:
+            self.log.info("Attempting to squash from layer %s...", self.squash_id)
+
+            self.log.info("We have %s layers to squash",
+                          len(self.layers_to_squash))
+
         self.log.debug("Layers to squash: %s", self.layers_to_squash)
 
         # Save the image in tar format in the tepmorary directory

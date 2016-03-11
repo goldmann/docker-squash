@@ -295,6 +295,6 @@ class V2Image(Image):
         metadata['history'].append(history)
 
         # Update image id, should be one layer below squashed layer
-        metadata['config']['Image'] = self.squash_id
+#        metadata['config']['Image'] = self.squash_id
 
         return metadata

@@ -645,7 +645,6 @@ class NumericValues(IntegSquash):
             with self.SquashedImage(NumericValues.image, 0, numeric=True):
                 pass
 
-    @unittest.skip("Not implemented")
     def test_should_squash_specific_number_of_layers(self):
         with self.SquashedImage(NumericValues.image, 2, numeric=True):
             pass

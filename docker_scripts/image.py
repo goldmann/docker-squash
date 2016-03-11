@@ -116,6 +116,21 @@ class Image(object):
 
         self.old_image_layers.reverse()
 
+        try:
+            number_of_layers = int(self.from_layer)
+
+            if number_of_layers <= 0:
+                raise SquashError("Number of layers to squash cannot be less or equal 0, provided: %s" % number_of_layers)
+        except ValueError:
+            number_of_layers = None
+
+        # Do not squash if provided number of layer to squash is bigger
+        # than number of actual layers in the image
+        if number_of_layers:
+            if number_of_layers > len(self.old_image_layers):
+                raise SquashError(
+                    "Cannot squash %s layers, the %s image contains only %s layers" % (number_of_layers, self.image, len(self.old_image_layers)))
+
         # The id or name of the layer/image that the squashing should begin from
         # This layer WILL NOT be squashed, but all next layers will
         if self.from_layer:

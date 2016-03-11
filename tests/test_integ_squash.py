@@ -34,7 +34,7 @@ class ImageHelper(object):
             manifest = json.load(reader(tar.extractfile(manifest_member)))
             return manifest[0]["Layers"][-1].split("/")[0]
 
-class TestIntegSquash(unittest.TestCase):
+class IntegSquash(unittest.TestCase):
 
     BUSYBOX_IMAGE = "busybox:1.24"
 
@@ -49,6 +49,15 @@ class TestIntegSquash(unittest.TestCase):
     handler.setFormatter(formatter)
     log.addHandler(handler)
     log.setLevel(logging.DEBUG)
+
+    @classmethod
+    def build_image(cls, dockerfile):
+        IntegSquash.image = IntegSquash.Image(dockerfile)
+        IntegSquash.image.__enter__()
+
+    @classmethod
+    def cleanup_image(cls):
+        IntegSquash.image.__exit__(None, None, None)
 
     class Image(object):
 
@@ -92,7 +101,7 @@ class TestIntegSquash(unittest.TestCase):
 
     class SquashedImage(object):
 
-        def __init__(self, image, number_of_layers, output_path=None, load_image=True):
+        def __init__(self, image, number_of_layers, output_path=None, load_image=True, numeric=False):
             self.image = image
             self.number_of_layers = number_of_layers
             self.docker = TestIntegSquash.docker
@@ -100,10 +109,14 @@ class TestIntegSquash(unittest.TestCase):
             self.tag = "%s:squashed" % self.image.name
             self.output_path = output_path
             self.load_image = load_image
+            self.numeric = numeric
 
         def __enter__(self):
-            from_layer = self.docker.history(
-                self.image.tag)[self.number_of_layers]['Id']
+            if self.numeric:
+                from_layer = self.number_of_layers
+            else:
+                from_layer = self.docker.history(
+                    self.image.tag)[self.number_of_layers]['Id']
 
             squash = Squash(
                 self.log, self.image.tag, self.docker, tag=self.tag, from_layer=from_layer,
@@ -195,6 +208,8 @@ class TestIntegSquash(unittest.TestCase):
             with tarfile.open(fileobj=self.content, mode='r') as tar:
                 assert name not in tar.getnames(
                 ), "File %s was found in the container files: %s" % (name, tar.getnames())
+
+class TestIntegSquash(IntegSquash):
 
     def test_all_files_should_be_in_squashed_layer(self):
         """
@@ -584,6 +599,56 @@ class TestIntegSquash(unittest.TestCase):
                     pass
 
         self.assertEquals(str(cm.exception), '1 layer(s) in this image marked to squash, no squashing is required')
+
+    # https://github.com/goldmann/docker-scripts/issues/52
+    @unittest.skip("Not implemented")
+    def test_mixed_layers_squashing_with_from_should_fail(self):
+        dockerfile = '''
+        FROM busybox:1.24.0
+        CMD /bin/env
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.assertRaises(SquashError) as cm:
+                with self.SquashedImage(image, 1, numeric=True):
+                    pass
+
+            self.assertEquals(str(cm.exception), 'You did not specify from which layer or how many layers you want squash')
+
+class NumericValues(IntegSquash):
+    @classmethod
+    def setUpClass(cls):
+        dockerfile = '''
+        FROM busybox:1.24.0
+        LABEL a=b
+        CMD /bin/env
+        '''
+
+        IntegSquash.build_image(dockerfile)
+
+    @classmethod
+    def tearDownClass(cls):
+        IntegSquash.cleanup_image()
+
+    def test_should_not_squash_more_layers_than_image_has(self):
+        with self.assertRaisesRegexp(SquashError, "Cannot squash 20 layers, the .* image contains only \d layers"):
+            with self.SquashedImage(NumericValues.image, 20, numeric=True):
+                pass
+
+    def test_should_not_squash_negative_number_of_layers(self):
+        with self.assertRaisesRegexp(SquashError, "Number of layers to squash cannot be less or equal 0, provided: -1"):
+            with self.SquashedImage(NumericValues.image, -1, numeric=True):
+                pass
+
+    def test_should_not_squash_zero_number_of_layers(self):
+        with self.assertRaisesRegexp(SquashError, "Number of layers to squash cannot be less or equal 0, provided: 0"):
+            with self.SquashedImage(NumericValues.image, 0, numeric=True):
+                pass
+
+    @unittest.skip("Not implemented")
+    def test_should_squash_specific_number_of_layers(self):
+        with self.SquashedImage(NumericValues.image, 2, numeric=True):
+            pass
 
 if __name__ == '__main__':
     unittest.main()

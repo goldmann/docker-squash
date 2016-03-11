@@ -78,7 +78,7 @@ class Squash(object):
             # Load squashed image into Docker
             image.load_squashed_image()
 
-        # image.cleanup()
+        image.cleanup()
 
         self.log.info("Done")
 

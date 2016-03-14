@@ -160,8 +160,8 @@ class Image(object):
         self.squash_number = self._number_of_layers()
 
         if self.squash_number:
-            self.layers_to_squash = self.old_image_layers[self.squash_number:]
-            self.layers_to_move = self.old_image_layers[:self.squash_number]
+            self.layers_to_squash = self.old_image_layers[:self.squash_number]
+            self.layers_to_move = self.old_image_layers[self.squash_number:]
         else:
             self.squash_id = self._from_layer()
 

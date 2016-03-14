@@ -22,7 +22,8 @@ class V1Image(Image):
     def _before_squashing(self):
         super(V1Image, self)._before_squashing()
 
-        self.squash_id = self.layers_to_move[-1]
+        if self.layers_to_move:
+            self.squash_id = self.layers_to_move[-1]
 
     def _squash(self):
         # Prepare the directory
@@ -47,8 +48,26 @@ class V1Image(Image):
     def update_squashed_layer_metadata(self, old_json_file, squashed_dir):
         image_id = self._generate_image_id()
 
-        metadata = self._layer_metadata(old_json_file)
-        metadata['parent'] = self.squash_id
+        metadata = self._read_old_metadata(old_json_file)
+
+        # Modify common metadata fields
+        if self.squash_id:
+            metadata['config']['Image'] = self.squash_id
+        else:
+            metadata['config'].pop('Image', None)
+
+        metadata['created'] = self.date
+
+        # Remove unnecessary fields
+        del metadata['container_config']
+        del metadata['container']
+        del metadata['config']['Hostname']
+
+        if self.squash_id:
+            metadata['parent'] = self.squash_id
+        else:
+            metadata.pop('parent', None)
+
         metadata['id'] = image_id
         metadata['Size'] = os.path.getsize(
             os.path.join(self.squashed_dir, "layer.tar"))
@@ -59,16 +78,3 @@ class V1Image(Image):
 
         return image_id
 
-    def _layer_metadata(self, old_json_file):
-        metadata = self._read_old_metadata(old_json_file)
-
-        # Modify common metadata fields
-        metadata['config']['Image'] = self.squash_id
-        metadata['created'] = self.date
-
-        # Remove unnecessary fields
-        del metadata['container_config']
-        del metadata['container']
-        del metadata['config']['Hostname']
-
-        return metadata

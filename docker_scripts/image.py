@@ -166,7 +166,7 @@ class Image(object):
                 raise SquashError(
                     "The %s layer could not be found in the %s image" % (self.from_layer, self.image))
 
-            number_of_layers = self.old_image_layers.index(squash_id)
+            number_of_layers = len(self.old_image_layers) - self.old_image_layers.index(squash_id) - 1
 
         self._validate_number_of_layers(number_of_layers)
 

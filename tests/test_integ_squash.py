@@ -101,7 +101,7 @@ class IntegSquash(unittest.TestCase):
 
     class SquashedImage(object):
 
-        def __init__(self, image, number_of_layers, output_path=None, load_image=True, numeric=False):
+        def __init__(self, image, number_of_layers=None, output_path=None, load_image=True, numeric=False):
             self.image = image
             self.number_of_layers = number_of_layers
             self.docker = TestIntegSquash.docker
@@ -112,9 +112,9 @@ class IntegSquash(unittest.TestCase):
             self.numeric = numeric
 
         def __enter__(self):
-            if self.numeric:
-                from_layer = self.number_of_layers
-            else:
+            from_layer = self.number_of_layers
+
+            if self.number_of_layers and not self.numeric:
                 from_layer = self.docker.history(
                     self.image.tag)[self.number_of_layers]['Id']
 
@@ -123,6 +123,7 @@ class IntegSquash(unittest.TestCase):
                 output_path=self.output_path, load_image=self.load_image)
 
             self.image_id = squash.run()
+            self.history = self.docker.history(self.tag)
 
             self.tar = self._save_image()
 
@@ -133,7 +134,6 @@ class IntegSquash(unittest.TestCase):
                 self.squashed_layer = self._squashed_layer()
                 self.layers = [o['Id'] for o in self.docker.history(self.tag)]
                 self.metadata = self.docker.inspect_image(self.tag)
-
 
             return self
 
@@ -610,19 +610,20 @@ class TestIntegSquash(IntegSquash):
         self.assertEquals(str(cm.exception), '1 layer(s) in this image marked to squash, no squashing is required')
 
     # https://github.com/goldmann/docker-scripts/issues/52
-    @unittest.skip("Not implemented")
-    def test_mixed_layers_squashing_with_from_should_fail(self):
+    # Test may be misleading, but squashing all layers makes sure we hit
+    # at least one <missing> layer
+    def test_should_squash_every_layer(self):
         dockerfile = '''
         FROM busybox:1.24.0
+        RUN touch /tmp/test1
+        RUN touch /tmp/test2
         CMD /bin/env
+        LABEL foo bar
         '''
 
         with self.Image(dockerfile) as image:
-            with self.assertRaises(SquashError) as cm:
-                with self.SquashedImage(image, 1, numeric=True):
-                    pass
-
-            self.assertEquals(str(cm.exception), 'You did not specify from which layer or how many layers you want squash')
+            with self.SquashedImage(image) as squashed_image:
+                pass
 
 class NumericValues(IntegSquash):
     @classmethod
@@ -658,16 +659,19 @@ class NumericValues(IntegSquash):
 
     def test_should_squash_2_layers(self):
         with self.SquashedImage(NumericValues.image, 2, numeric=True) as squashed_image:
+            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 1)
 
     def test_should_squash_3_layers(self):
         with self.SquashedImage(NumericValues.image, 3, numeric=True) as squashed_image:
+            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 2)
 
     def test_should_squash_4_layers(self):
         with self.SquashedImage(NumericValues.image, 4, numeric=True) as squashed_image:
+            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 3)
 

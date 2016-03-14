@@ -19,6 +19,10 @@ class V1Image(Image):
             except ValueError:
                 # All good!
                 return image_id
+    def _before_squashing(self):
+        super(V1Image, self)._before_squashing()
+
+        self.squash_id = self.layers_to_move[-1]
 
     def _squash(self):
         # Prepare the directory
@@ -54,3 +58,17 @@ class V1Image(Image):
             "%s" % json_metadata, os.path.join(self.squashed_dir, "json"))
 
         return image_id
+
+    def _layer_metadata(self, old_json_file):
+        metadata = self._read_old_metadata(old_json_file)
+
+        # Modify common metadata fields
+        metadata['config']['Image'] = self.squash_id
+        metadata['created'] = self.date
+
+        # Remove unnecessary fields
+        del metadata['container_config']
+        del metadata['container']
+        del metadata['config']['Hostname']
+
+        return metadata

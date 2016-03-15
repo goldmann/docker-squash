@@ -19,6 +19,7 @@ class V1Image(Image):
             except ValueError:
                 # All good!
                 return image_id
+
     def _before_squashing(self):
         super(V1Image, self)._before_squashing()
 
@@ -37,7 +38,7 @@ class V1Image(Image):
         config_file = os.path.join(
             self.old_image_dir, self.old_image_id, "json")
 
-        image_id = self.update_squashed_layer_metadata(
+        image_id = self._update_squashed_layer_metadata(
             config_file, self.squashed_dir)
         shutil.move(self.squashed_dir, os.path.join(
             self.new_image_dir, image_id))
@@ -45,7 +46,7 @@ class V1Image(Image):
         self._generate_repositories_json(
             repositories_file, image_id, self.image_name, self.image_tag)
 
-    def update_squashed_layer_metadata(self, old_json_file, squashed_dir):
+    def _update_squashed_layer_metadata(self, old_json_file, squashed_dir):
         image_id = self._generate_image_id()
 
         metadata = self._read_old_metadata(old_json_file)
@@ -70,11 +71,10 @@ class V1Image(Image):
 
         metadata['id'] = image_id
         metadata['Size'] = os.path.getsize(
-            os.path.join(self.squashed_dir, "layer.tar"))
+            os.path.join(squashed_dir, "layer.tar"))
         json_metadata = self._dump_json(metadata)[0]
 
         self._write_json_metadata(
-            "%s" % json_metadata, os.path.join(self.squashed_dir, "json"))
+            "%s" % json_metadata, os.path.join(squashed_dir, "json"))
 
         return image_id
-

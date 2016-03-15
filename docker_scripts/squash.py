@@ -1,12 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import tempfile
-import shutil
 import os
-import random
-import hashlib
-import datetime
-import tarfile
 import six
 
 from distutils.version import StrictVersion

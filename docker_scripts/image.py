@@ -114,6 +114,11 @@ class Image(object):
         return squash_id
 
     def _validate_number_of_layers(self, number_of_layers):
+        """
+        Makes sure that the specified number of layers to squash
+        is a valid number
+        """
+
         # Only positive numbers are correct
         if number_of_layers <= 0:
             raise SquashError(

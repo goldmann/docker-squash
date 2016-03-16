@@ -1,13 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import json
-import tempfile
-import shutil
 import os
-import random
-import hashlib
-import datetime
-import tarfile
 import six
 
 from distutils.version import StrictVersion
@@ -17,10 +10,6 @@ from docker_scripts.v2_image import V2Image
 from docker_scripts.lib import common
 from docker_scripts.errors import SquashError
 from docker_scripts.version import version
-
-if not six.PY3:
-    import lib.xtarfile
-
 
 class Squash(object):
 

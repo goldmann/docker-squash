@@ -34,7 +34,7 @@ class ImageHelper(object):
             manifest = json.load(reader(tar.extractfile(manifest_member)))
             return manifest[0]["Layers"][-1].split("/")[0]
 
-class TestIntegSquash(unittest.TestCase):
+class IntegSquash(unittest.TestCase):
 
     BUSYBOX_IMAGE = "busybox:1.24"
 
@@ -49,6 +49,15 @@ class TestIntegSquash(unittest.TestCase):
     handler.setFormatter(formatter)
     log.addHandler(handler)
     log.setLevel(logging.DEBUG)
+
+    @classmethod
+    def build_image(cls, dockerfile):
+        IntegSquash.image = IntegSquash.Image(dockerfile)
+        IntegSquash.image.__enter__()
+
+    @classmethod
+    def cleanup_image(cls):
+        IntegSquash.image.__exit__(None, None, None)
 
     class Image(object):
 
@@ -92,7 +101,7 @@ class TestIntegSquash(unittest.TestCase):
 
     class SquashedImage(object):
 
-        def __init__(self, image, number_of_layers, output_path=None, load_image=True):
+        def __init__(self, image, number_of_layers=None, output_path=None, load_image=True, numeric=False):
             self.image = image
             self.number_of_layers = number_of_layers
             self.docker = TestIntegSquash.docker
@@ -100,15 +109,21 @@ class TestIntegSquash(unittest.TestCase):
             self.tag = "%s:squashed" % self.image.name
             self.output_path = output_path
             self.load_image = load_image
+            self.numeric = numeric
 
         def __enter__(self):
-            from_layer = self.docker.history(
-                self.image.tag)[self.number_of_layers]['Id']
+            from_layer = self.number_of_layers
+
+            if self.number_of_layers and not self.numeric:
+                from_layer = self.docker.history(
+                    self.image.tag)[self.number_of_layers]['Id']
 
             squash = Squash(
                 self.log, self.image.tag, self.docker, tag=self.tag, from_layer=from_layer,
                 output_path=self.output_path, load_image=self.load_image)
+
             self.image_id = squash.run()
+            self.history = self.docker.history(self.tag)
 
             self.tar = self._save_image()
 
@@ -119,7 +134,6 @@ class TestIntegSquash(unittest.TestCase):
                 self.squashed_layer = self._squashed_layer()
                 self.layers = [o['Id'] for o in self.docker.history(self.tag)]
                 self.metadata = self.docker.inspect_image(self.tag)
-
 
             return self
 
@@ -195,6 +209,8 @@ class TestIntegSquash(unittest.TestCase):
             with tarfile.open(fileobj=self.content, mode='r') as tar:
                 assert name not in tar.getnames(
                 ), "File %s was found in the container files: %s" % (name, tar.getnames())
+
+class TestIntegSquash(IntegSquash):
 
     def test_all_files_should_be_in_squashed_layer(self):
         """
@@ -438,6 +454,8 @@ class TestIntegSquash(unittest.TestCase):
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2) as squashed_image:
                 self.assertEqual(
+                    len(squashed_image.layers), len(image.layers) - 1)
+                self.assertEqual(
                     image.metadata['DockerVersion'], squashed_image.metadata['DockerVersion'])
 
     # https://github.com/goldmann/docker-scripts/issues/30
@@ -451,6 +469,8 @@ class TestIntegSquash(unittest.TestCase):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2, output_path="image.tar") as squashed_image:
+                self.assertEqual(
+                    len(squashed_image.layers), len(image.layers) - 1)
                 with tarfile.open("image.tar", mode='r') as tar:
                     all_files = tar.getnames()
                     for name in all_files:
@@ -466,6 +486,8 @@ class TestIntegSquash(unittest.TestCase):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2, output_path="image.tar") as squashed_image:
+                self.assertEqual(
+                    len(squashed_image.layers), len(image.layers) - 1)
                 with tarfile.open("image.tar", mode='r') as tar:
                     squashed_layer_path = ImageHelper.top_layer_path(tar)
                     
@@ -485,6 +507,8 @@ class TestIntegSquash(unittest.TestCase):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2) as squashed_image:
+                self.assertEqual(
+                    len(squashed_image.layers), len(image.layers) - 1)
                 self.assertIsInstance(image.metadata['Size'], int)
                 with self.assertRaisesRegexp(KeyError, "'size'"):
                     self.assertEqual(image.metadata['size'], None)
@@ -499,6 +523,8 @@ class TestIntegSquash(unittest.TestCase):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2) as squashed_image:
+                self.assertEqual(
+                    len(squashed_image.layers), len(image.layers) - 1)
                 image_data_layers = [s for s in image.tarnames if "layer.tar" in s]
                 squashed_image_data_layers = [s for s in squashed_image.tarnames if "layer.tar" in s]
 
@@ -508,15 +534,11 @@ class TestIntegSquash(unittest.TestCase):
                     # In our test case we did not add any data, so the count should
                     # be the same
                     self.assertEqual(len(image_data_layers), len(squashed_image_data_layers))
-                    # In v2 we squashed 2 empty layers, so no new squashed layer was added
-                    self.assertEqual(len(image.layers), len(squashed_image.layers) + 1)
                 else:
                     # For v1
                     # V1 image contains as many layer.tar archives as the image has layers
                     # We squashed 2 layers, so squashed image contains one layer less
                     self.assertEqual(len(image_data_layers), len(squashed_image_data_layers) + 1)
-                    # In v1 we squashed 2 layers into one, so only one layer was removed
-                    self.assertEqual(len(image.layers), len(squashed_image.layers) + 1)
 
 
     def test_load_image_produces_file_and_engine_image(self):
@@ -529,6 +551,8 @@ class TestIntegSquash(unittest.TestCase):
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2, output_path="image.tar", load_image=True) \
                     as squashed_image:
+                self.assertEqual(
+                    len(squashed_image.layers), len(image.layers) - 1)
                 # first, make sure that the exported image exists and is ok
                 with tarfile.open("image.tar", mode='r') as tar:
                     squashed_layer_path = ImageHelper.top_layer_path(tar)
@@ -584,6 +608,72 @@ class TestIntegSquash(unittest.TestCase):
                     pass
 
         self.assertEquals(str(cm.exception), '1 layer(s) in this image marked to squash, no squashing is required')
+
+    # https://github.com/goldmann/docker-scripts/issues/52
+    # Test may be misleading, but squashing all layers makes sure we hit
+    # at least one <missing> layer
+    def test_should_squash_every_layer(self):
+        dockerfile = '''
+        FROM busybox:1.24.0
+        RUN touch /tmp/test1
+        RUN touch /tmp/test2
+        CMD /bin/env
+        LABEL foo bar
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image) as squashed_image:
+                pass
+
+class NumericValues(IntegSquash):
+    @classmethod
+    def setUpClass(cls):
+        dockerfile = '''
+        FROM busybox:1.24.0
+        RUN touch /tmp/test1
+        RUN touch /tmp/test2
+        CMD /bin/env
+        LABEL foo bar
+        '''
+
+        IntegSquash.build_image(dockerfile)
+
+    @classmethod
+    def tearDownClass(cls):
+        IntegSquash.cleanup_image()
+
+    def test_should_not_squash_more_layers_than_image_has(self):
+        with self.assertRaisesRegexp(SquashError, "Cannot squash 20 layers, the .* image contains only \d layers"):
+            with self.SquashedImage(NumericValues.image, 20, numeric=True):
+                pass
+
+    def test_should_not_squash_negative_number_of_layers(self):
+        with self.assertRaisesRegexp(SquashError, "Number of layers to squash cannot be less or equal 0, provided: -1"):
+            with self.SquashedImage(NumericValues.image, -1, numeric=True):
+                pass
+
+    def test_should_not_squash_zero_number_of_layers(self):
+        with self.assertRaisesRegexp(SquashError, "Number of layers to squash cannot be less or equal 0, provided: 0"):
+            with self.SquashedImage(NumericValues.image, 0, numeric=True):
+                pass
+
+    def test_should_squash_2_layers(self):
+        with self.SquashedImage(NumericValues.image, 2, numeric=True) as squashed_image:
+            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
+            self.assertEqual(
+                len(squashed_image.layers), len(NumericValues.image.layers) - 1)
+
+    def test_should_squash_3_layers(self):
+        with self.SquashedImage(NumericValues.image, 3, numeric=True) as squashed_image:
+            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
+            self.assertEqual(
+                len(squashed_image.layers), len(NumericValues.image.layers) - 2)
+
+    def test_should_squash_4_layers(self):
+        with self.SquashedImage(NumericValues.image, 4, numeric=True) as squashed_image:
+            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
+            self.assertEqual(
+                len(squashed_image.layers), len(NumericValues.image.layers) - 3)
 
 if __name__ == '__main__':
     unittest.main()

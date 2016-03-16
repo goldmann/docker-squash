@@ -28,6 +28,9 @@ class V2Image(Image):
         self.layer_paths_to_squash, self.layer_paths_to_move = self._read_layer_paths(
             self.old_image_config, self.old_image_manifest, self.layers_to_move)
 
+        if self.layer_paths_to_move:
+            self.squash_id = self.layer_paths_to_move[-1]
+
     def _squash(self):
         if self.layer_paths_to_squash:
             # Prepare the directory
@@ -231,15 +234,20 @@ class V2Image(Image):
         # exported tar archive) of the last layer that we move
         # (layer below squashed layer)
 
-        if self.layer_paths_to_squash:
-            parent = self.layer_paths_to_move[-1]
-        else:
-            parent = self.layer_paths_to_move[0]
+        if self.layer_paths_to_move:
+            if self.layer_paths_to_squash:
+                parent = self.layer_paths_to_move[-1]
+            else:
+                parent = self.layer_paths_to_move[0]
 
-        v1_metadata['parent'] = "sha256:%s" % parent
+            v1_metadata['parent'] = "sha256:%s" % parent
 
         # The 'Image' element is the id of the layer from which we squash
-        v1_metadata['config']['Image'] = self.squash_id
+        if self.squash_id:
+            # Update image id, should be one layer below squashed layer
+            v1_metadata['config']['Image'] = self.squash_id
+        else:
+            v1_metadata['config']['Image'] = ""
 
         # Get the sha256sum of the JSON exported metadata,
         # we do not care about the metadata anymore
@@ -258,9 +266,18 @@ class V2Image(Image):
             config = json.load(f, object_pairs_hook=OrderedDict)
 
         config['created'] = self.date
-        config['config']['Image'] = self.squash_id
+
+        if self.squash_id:
+            # Update image id, should be one layer below squashed layer
+            config['config']['Image'] = self.squash_id
+        else:
+            config['config']['Image'] = ""
+
         # Update 'parent' - it should be path to the last layer to move
-        config['parent'] = self.layer_paths_to_move[-1]
+        if self.layer_paths_to_move:
+            config['parent'] = self.layer_paths_to_move[-1]
+        else:
+            del config['parent']
         # Update 'id' - it should be the path to the layer
         config['id'] = layer_path_id
         del config['container']
@@ -294,7 +311,10 @@ class V2Image(Image):
         # Add new entry for squashed layer to history
         metadata['history'].append(history)
 
-        # Update image id, should be one layer below squashed layer
-        metadata['config']['Image'] = self.squash_id
+        if self.squash_id:
+            # Update image id, should be one layer below squashed layer
+            metadata['config']['Image'] = self.squash_id
+        else:
+            metadata['config']['Image'] = ""
 
         return metadata

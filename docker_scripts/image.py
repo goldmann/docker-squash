@@ -46,6 +46,7 @@ class Image(object):
         self.tag = tag
         self.image_name = None
         self.image_tag = None
+        self.squash_id = None
 
         # Workaround for https://play.golang.org/p/sCsWMXYxqy
         #
@@ -82,23 +83,60 @@ class Image(object):
         except:
             raise SquashError("Preparing temporary directory failed")
 
+        # Temporary location on the disk of the old, unpacked *image*
         self.old_image_dir = os.path.join(self.tmp_dir, "old")
-        """ Temporary location on the disk of the old, unpacked *image* """
+        # Temporary location on the disk of the new, unpacked, squashed *image*
         self.new_image_dir = os.path.join(self.tmp_dir, "new")
-        """ Temporary location on the disk of the new, unpacked, squashed *image* """
+        # Temporary location on the disk of the squashed *layer*
         self.squashed_dir = os.path.join(self.new_image_dir, "squashed")
-        """ Temporary location on the disk of the squashed *layer* """
 
         for d in self.old_image_dir, self.new_image_dir:
             os.makedirs(d)
 
+    def _squash_id(self, layer):
+        if layer == "<missing>":
+            self.log.warn(
+                "You try to squash from layer that does not have it's own ID, we'll try to find it later")
+            return None
+
+        try:
+            squash_id = self.docker.inspect_image(layer)['Id']
+        except:
+            raise SquashError(
+                "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % layer)
+
+        if squash_id not in self.old_image_layers:
+            raise SquashError(
+                "Couldn't find the provided layer (%s) in the %s image" % (layer, self.image))
+
+        self.log.debug("Layer ID to squash from: %s" % squash_id)
+
+        return squash_id
+
+    def _validate_number_of_layers(self, number_of_layers):
+        """
+        Makes sure that the specified number of layers to squash
+        is a valid number
+        """
+
+        # Only positive numbers are correct
+        if number_of_layers <= 0:
+            raise SquashError(
+                "Number of layers to squash cannot be less or equal 0, provided: %s" % number_of_layers)
+
+        # Do not squash if provided number of layer to squash is bigger
+        # than number of actual layers in the image
+        if number_of_layers > len(self.old_image_layers):
+            raise SquashError(
+                "Cannot squash %s layers, the %s image contains only %s layers" % (number_of_layers, self.image, len(self.old_image_layers)))
+
     def _before_squashing(self):
         self._initialize_directories()
 
+        # Location of the exported tar archive with the image to squash
         self.old_image_tar = os.path.join(self.old_image_dir, "image.tar")
-        """ Location of the exported tar archive with the image to squash """
+        # Location of the tar archive with squashed layers
         self.squashed_tar = os.path.join(self.squashed_dir, "layer.tar")
-        """ Location of the tar archive with squashed layers """
 
         self.image_name, self.image_tag = self._parse_image_name(self.tag)
 
@@ -116,39 +154,47 @@ class Image(object):
 
         self.old_image_layers.reverse()
 
-        # The id or name of the layer/image that the squashing should begin from
-        # This layer WILL NOT be squashed, but all next layers will
-        if self.from_layer:
-            from_layer = self.from_layer
-        else:
-            from_layer = self.old_image_layers[0]
-
-        try:
-            self.squash_id = self.docker.inspect_image(from_layer)['Id']
-        except:
-            raise SquashError(
-                "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % from_layer)
-
         self.log.info("Old image has %s layers", len(self.old_image_layers))
         self.log.debug("Old layers: %s", self.old_image_layers)
 
-        if not self.squash_id in self.old_image_layers:
-            raise SquashError("Couldn't find the provided layer (%s) in the %s image" % (
-                self.from_layer, self.image))
+        # By default - squash all layers.
+        if self.from_layer == None:
+            self.from_layer = len(self.old_image_layers)
 
-        # Find the layers to squash and to move
-        self.layers_to_squash, self.layers_to_move = self._layers_to_squash(
-            self.old_image_layers, self.squash_id)
+        try:
+            number_of_layers = int(self.from_layer)
+
+            self.log.debug(
+                "We detected number of layers as the argument to squash")
+        except ValueError:
+            self.log.debug("We detected layer as the argument to squash")
+
+            squash_id = self._squash_id(self.from_layer)
+
+            if not squash_id:
+                raise SquashError(
+                    "The %s layer could not be found in the %s image" % (self.from_layer, self.image))
+
+            number_of_layers = len(self.old_image_layers) - \
+                self.old_image_layers.index(squash_id) - 1
+
+        self._validate_number_of_layers(number_of_layers)
+
+        marker = len(self.old_image_layers) - number_of_layers
+
+        self.layers_to_squash = self.old_image_layers[marker:]
+        self.layers_to_move = self.old_image_layers[:marker]
 
         self.log.info("Checking if squashing is necessary...")
 
         if len(self.layers_to_squash) <= 1:
-            raise SquashError("%s layer(s) in this image marked to squash, no squashing is required" % len(self.layers_to_squash))
+            raise SquashError("%s layer(s) in this image marked to squash, no squashing is required" % len(
+                self.layers_to_squash))
 
-        self.log.info("Attempting to squash from layer %s...", self.squash_id)
-        self.log.info("We have %s layers to squash",
-                      len(self.layers_to_squash))
+        self.log.info("Attempting to squash last %s layers...",
+                      number_of_layers)
         self.log.debug("Layers to squash: %s", self.layers_to_squash)
+        self.log.debug("Layers to move: %s", self.layers_to_move)
 
         # Save the image in tar format in the tepmorary directory
         self._save_image(self.old_image_id, self.old_image_tar)
@@ -310,7 +356,7 @@ class Image(object):
         name and tag part, if possible. If no tag is provided
         'latest' is used.
         """
-        if ':' in image and not '/' in image.split(':')[-1]:
+        if ':' in image and '/' not in image.split(':')[-1]:
             image_tag = image.split(':')[-1]
             image_name = image[:-(len(image_tag) + 1)]
         else:
@@ -366,20 +412,6 @@ class Image(object):
         # Read original metadata
         with open(old_json_file, 'r') as f:
             metadata = json.load(f)
-
-        return metadata
-
-    def _layer_metadata(self, old_json_file):
-        metadata = self._read_old_metadata(old_json_file)
-
-        # Modify common metadata fields that apply to v1 and v2
-        metadata['config']['Image'] = self.squash_id
-        metadata['created'] = self.date
-
-        # Remove unnecessary fields
-        del metadata['container_config']
-        del metadata['container']
-        del metadata['config']['Hostname']
 
         return metadata
 

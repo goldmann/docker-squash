@@ -247,7 +247,7 @@ class V2Image(Image):
             # Update image id, should be one layer below squashed layer
             v1_metadata['config']['Image'] = self.squash_id
         else:
-            v1_metadata['config'].pop('Image', None)
+            v1_metadata['config']['Image'] = ""
 
         # Get the sha256sum of the JSON exported metadata,
         # we do not care about the metadata anymore
@@ -271,7 +271,7 @@ class V2Image(Image):
             # Update image id, should be one layer below squashed layer
             config['config']['Image'] = self.squash_id
         else:
-            del config['config']['Image']
+            config['config']['Image'] = ""
 
         # Update 'parent' - it should be path to the last layer to move
         if self.layer_paths_to_move:
@@ -315,6 +315,6 @@ class V2Image(Image):
             # Update image id, should be one layer below squashed layer
             metadata['config']['Image'] = self.squash_id
         else:
-            del metadata['config']['Image']
+            metadata['config']['Image'] = ""
 
         return metadata

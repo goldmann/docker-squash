@@ -7,6 +7,7 @@ import docker
 import os
 import json
 import logging
+import shutil
 import sys
 import tarfile
 import io
@@ -101,15 +102,17 @@ class IntegSquash(unittest.TestCase):
 
     class SquashedImage(object):
 
-        def __init__(self, image, number_of_layers=None, output_path=None, load_image=True, numeric=False):
+        def __init__(self, image, number_of_layers=None, output_path=None, load_image=True, numeric=False, tmp_dir=None, log=None, development=False):
             self.image = image
             self.number_of_layers = number_of_layers
             self.docker = TestIntegSquash.docker
-            self.log = TestIntegSquash.log
+            self.log = log or TestIntegSquash.log
             self.tag = "%s:squashed" % self.image.name
             self.output_path = output_path
             self.load_image = load_image
             self.numeric = numeric
+            self.tmp_dir = tmp_dir
+            self.development = development
 
         def __enter__(self):
             from_layer = self.number_of_layers
@@ -120,7 +123,7 @@ class IntegSquash(unittest.TestCase):
 
             squash = Squash(
                 self.log, self.image.tag, self.docker, tag=self.tag, from_layer=from_layer,
-                output_path=self.output_path, load_image=self.load_image)
+                output_path=self.output_path, load_image=self.load_image, tmp_dir=self.tmp_dir, development=self.development)
 
             self.image_id = squash.run()
             self.history = self.docker.history(self.tag)
@@ -624,6 +627,51 @@ class TestIntegSquash(IntegSquash):
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image) as squashed_image:
                 pass
+
+    # https://github.com/goldmann/docker-scripts/issues/44
+    def test_remove_tmp_dir_after_failure(self):
+        dockerfile = '''
+        FROM busybox:1.24.0
+        LABEL foo bar
+        '''
+
+        tmp_dir = "/tmp/docker-squash-integ-tmp-dir"
+        log = mock.Mock()
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        self.assertFalse(os.path.exists(tmp_dir))
+
+        with self.Image(dockerfile) as image:
+            with self.assertRaisesRegexp(SquashError, "Cannot squash 20 layers, the .* image contains only \d layers"):
+                with self.SquashedImage(image, 20, numeric=True, tmp_dir=tmp_dir, log=log):
+                    pass
+
+        log.debug.assert_any_call("Using /tmp/docker-squash-integ-tmp-dir as the temporary directory")
+        log.debug.assert_any_call("Cleaning up /tmp/docker-squash-integ-tmp-dir temporary directory")
+
+        self.assertFalse(os.path.exists(tmp_dir))
+
+    def test_should_not_remove_tmp_dir_after_failure_if_development_mode_is_on(self):
+        dockerfile = '''
+        FROM busybox:1.24.0
+        LABEL foo bar
+        '''
+
+        tmp_dir = "/tmp/docker-squash-integ-tmp-dir"
+        log = mock.Mock()
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        self.assertFalse(os.path.exists(tmp_dir))
+
+        with self.Image(dockerfile) as image:
+            with self.assertRaisesRegexp(SquashError, "Cannot squash 20 layers, the .* image contains only \d layers"):
+                with self.SquashedImage(image, 20, numeric=True, tmp_dir=tmp_dir, log=log, development=True):
+                    pass
+
+        log.debug.assert_any_call("Using /tmp/docker-squash-integ-tmp-dir as the temporary directory")
+
+        self.assertTrue(os.path.exists(tmp_dir))
+
 
 class NumericValues(IntegSquash):
     @classmethod

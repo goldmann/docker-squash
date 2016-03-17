@@ -11,10 +11,11 @@ from docker_scripts.lib import common
 from docker_scripts.errors import SquashError
 from docker_scripts.version import version
 
+
 class Squash(object):
 
     def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None,
-                 output_path=None, load_image=True):
+                 output_path=None, load_image=True, development=False):
         self.log = log
         self.docker = docker
         self.image = image
@@ -23,6 +24,7 @@ class Squash(object):
         self.tmp_dir = tmp_dir
         self.output_path = output_path
         self.load_image = load_image
+        self.development = development
 
         if not docker:
             self.docker = common.docker_client()
@@ -53,6 +55,18 @@ class Squash(object):
 
         self.log.info("Using %s image format" % image.FORMAT)
 
+        try:
+            return self.squash(image)
+        except Exception:
+            # https://github.com/goldmann/docker-scripts/issues/44
+            # If development mode is not enabled, make sure we clean up the
+            # temporary directory
+            if not self.development:
+                image.cleanup()
+
+            raise
+
+    def squash(self, image):
         # Do the actual squashing
         new_image_id = image.squash()
 

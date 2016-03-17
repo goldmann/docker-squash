@@ -29,7 +29,7 @@ class CLI(object):
 
     def run_squash(self, args):
         squash.Squash(log=self.log, image=args.image,
-                      from_layer=args.from_layer, tag=args.tag, output_path=args.output_path, tmp_dir=args.tmp_dir).run()
+                      from_layer=args.from_layer, tag=args.tag, output_path=args.output_path, tmp_dir=args.tmp_dir, development=args.development).run()
 
     def run_layers(self, args):
         layers.Layers(log=self.log, image=args.image,
@@ -53,7 +53,9 @@ class CLI(object):
         parser_squash.set_defaults(func=self.run_squash)
         parser_squash.add_argument('image', help='Image to be squashed')
         parser_squash.add_argument(
-            '-f', '--from-layer', help='ID of the layer or image ID or image name. If not specified will squash up to last layer (FROM instruction)')
+            '-d', '--development', action='store_true', help='Does not clean up after failure for easier debugging')
+        parser_squash.add_argument(
+            '-f', '--from-layer', help='ID of the layer or image ID or image name. If not specified will squash all layers in the image')
         parser_squash.add_argument(
             '-t', '--tag', help="Specify the tag to be used for the new image. By default it'll be set to 'image' argument")
         parser_squash.add_argument(
@@ -88,7 +90,13 @@ class CLI(object):
         try:
             args.func(args)
         except Error as e:
-            self.log.exception(e)
+            if args.development or args.verbose:
+                self.log.exception(e)
+            else:
+                self.log.error(e.message)
+                self.log.error(
+                    "Squashing failed, if you think this is our fault, please file an issue: https://github.com/goldmann/docker-scripts/issues, thanks!")
+
             sys.exit(1)
 
 

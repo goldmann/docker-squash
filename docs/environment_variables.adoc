@@ -1,0 +1,25 @@
+# Environemnt variables
+
+Below you can find environment variables you can set while using this tool.
+
+## `DOCKER_TIMEOUT`
+
+Default value: `600`
+
+Specifies time (in seconds) to wait for the Docker daemon to prepare a response to an API call
+we make. In most cases this is not important, but you may consider to bump this value if
+your Docker engine is busy.
+
+Most resource consuming call is exporting the image tar from daemon. If you build parallel
+some images and/or export more images at the same time -- Docker can fail to prepare the archive
+in time and you'll see a timeout. This squash tool will retry (3 times) to fetch it, but sometimes
+you want to make the timeout a bit higher.
+
+## `DOCKER_CONNECTION`
+
+Default value: `unix://var/run/docker.sock`
+
+Connection string to the Docker daemon. You will not be required to change this if
+you use default installation of Docker, which creates the socket at `/var/run/docker.sock`.
+If you do use custom Docker daemon settings or connect to a remote Docker daemon --
+update this environment variable.

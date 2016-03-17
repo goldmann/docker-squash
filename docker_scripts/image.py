@@ -73,8 +73,10 @@ class Image(object):
         pass
 
     def cleanup(self):
-        # Cleanup the temporary directory
-        shutil.rmtree(self.tmp_dir)
+        """ Cleanup the temporary directory """
+
+        self.log.debug("Cleaning up %s temporary directory" % self.tmp_dir)
+        shutil.rmtree(self.tmp_dir, ignore_errors=True)
 
     def _initialize_directories(self):
         # Prepare temporary directory where all the work will be executed

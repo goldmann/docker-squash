@@ -1,4 +1,4 @@
-# Environemnt variables
+# Environment variables
 
 Below you can find environment variables you can set while using this tool.
 

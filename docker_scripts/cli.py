@@ -94,7 +94,8 @@ class CLI(object):
                 self.log.exception(e)
             else:
                 self.log.error(e.message)
-                self.log.error("Squashing failed, exiting. If you think this is our fault, please open a new issue: https://github.com/goldmann/docker-scripts/issues, thanks!")
+                self.log.error(
+                    "Squashing failed, if you think this is our fault, please file an issue: https://github.com/goldmann/docker-scripts/issues, thanks!")
 
             sys.exit(1)
 

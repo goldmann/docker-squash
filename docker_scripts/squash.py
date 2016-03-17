@@ -11,6 +11,7 @@ from docker_scripts.lib import common
 from docker_scripts.errors import SquashError
 from docker_scripts.version import version
 
+
 class Squash(object):
 
     def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None,
@@ -56,7 +57,7 @@ class Squash(object):
 
         try:
             return self.squash(image)
-        except Exception as e:
+        except Exception:
             # https://github.com/goldmann/docker-scripts/issues/44
             # If development mode is not enabled, make sure we clean up the
             # temporary directory

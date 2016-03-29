@@ -509,6 +509,8 @@ class Image(object):
         with tarfile.open(self.squashed_tar, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
             to_skip = []
             missed_markers = {}
+            # List of filenames in the squashed archive
+            squashed_files = []
 
             for layer_id in layers_to_squash:
                 layer_tar_file = os.path.join(
@@ -522,7 +524,6 @@ class Image(object):
                     # We need the list of marker files upfront, so we can
                     # skip unnecessary files
                     markers = self._marker_files(layer_tar)
-                    squashed_files = squashed_tar.getnames()
 
                     # Iterate over the marker files found for this particular
                     # layer and if in the squashed layers file corresponding
@@ -545,9 +546,6 @@ class Image(object):
                                 "Skipping '%s' file because it's on the list to skip files" % member.name)
                             continue
 
-                        # List of filenames in the squashed archive
-                        squashed_files = squashed_tar.getnames()
-
                         # Check if file is already added to the archive
                         if member.name in squashed_files:
                             # File already exist in the squashed archive, skip it because
@@ -565,6 +563,9 @@ class Image(object):
                             # Finally add the file to archive
                             squashed_tar.addfile(
                                 member, layer_tar.extractfile(member))
+
+                        # We added a file to the squashed tar, so let's note it
+                        squashed_files.append(member.name)
 
             self._add_markers(
                 missed_markers, squashed_tar, layers_to_move, self.old_image_dir)

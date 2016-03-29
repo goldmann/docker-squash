@@ -4,6 +4,7 @@ import docker
 import os
 import sys
 import requests
+import warnings
 
 
 DEFAULT_TIMEOUT_SECONDS = 600
@@ -23,15 +24,21 @@ def docker_client():
             "Provided timeout value needs to be greater than zero, currently: %s, exiting." % timeout)
         sys.exit(1)
 
-    # Default base url for the connection
-    base_url = os.getenv('DOCKER_CONNECTION', 'unix://var/run/docker.sock')
-
+    # backwards compat
     try:
-        client = docker.AutoVersionClient(base_url=base_url, timeout=timeout)
+        os.environ["DOCKER_HOST"] = os.environ["DOCKER_CONNECTION"]
+        warnings.warn("DOCKER_CONNECTION is deprecated, please use DOCKER_HOST instead", FutureWarning)
+    except KeyError:
+        pass
+
+    params = docker.utils.kwargs_from_env()
+    params["timeout"] = timeout
+    try:
+        client = docker.AutoVersionClient(**params)
     except docker.errors.DockerException as e:
         print("Error while creating the Docker client: %s" % e)
         print(
-            "Please make sure that you specified valid parameters in the 'DOCKER_CONNECTION' environment variable.")
+            "Please make sure that you specified valid parameters in the 'DOCKER_HOST' environment variable.")
         sys.exit(1)
 
     if client and valid_docker_connection(client):
@@ -40,9 +47,9 @@ def docker_client():
         print(
             "Could not connect to the Docker daemon, please make sure the Docker daemon is running.")
 
-        if os.environ.get('DOCKER_CONNECTION'):
+        if os.environ.get('DOCKER_HOST'):
             print(
-                "If Docker daemon is running, please make sure that you specified valid parameters in the 'DOCKER_CONNECTION' environment variable.")
+                "If Docker daemon is running, please make sure that you specified valid parameters in the 'DOCKER_HOST' environment variable.")
 
         sys.exit(1)
 

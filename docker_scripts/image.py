@@ -436,7 +436,7 @@ class Image(object):
 
         return False
 
-    def _marker_files(self, tar):
+    def _marker_files(self, tar, members):
         """
         Searches for marker files in the specified archive.
 
@@ -449,7 +449,7 @@ class Image(object):
         self.log.debug(
             "Searching for marker files in '%s' archive..." % tar.name)
 
-        for member in tar.getmembers():
+        for member in members:
             if '.wh.' in member.name:
                 self.log.debug("Found '%s' marker file" % member.name)
                 marker_files[member] = tar.extractfile(member)
@@ -523,7 +523,8 @@ class Image(object):
                     # Find all marker files for all layers
                     # We need the list of marker files upfront, so we can
                     # skip unnecessary files
-                    markers = self._marker_files(layer_tar)
+                    members = layer_tar.getmembers()
+                    markers = self._marker_files(layer_tar, members)
 
                     # Iterate over the marker files found for this particular
                     # layer and if in the squashed layers file corresponding
@@ -539,7 +540,7 @@ class Image(object):
                             missed_markers[marker] = marker_file
 
                     # Copy all the files to the new tar
-                    for member in layer_tar.getmembers():
+                    for member in members:
                         # Skip files that are marked to be skipped
                         if self._file_should_be_skipped(member.name, to_skip):
                             self.log.debug(

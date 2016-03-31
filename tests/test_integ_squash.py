@@ -126,14 +126,15 @@ class IntegSquash(unittest.TestCase):
                 output_path=self.output_path, load_image=self.load_image, tmp_dir=self.tmp_dir, development=self.development)
 
             self.image_id = squash.run()
-            self.history = self.docker.history(self.tag)
 
-            self.tar = self._save_image()
+            if not self.output_path:
+                self.history = self.docker.history(self.tag)
 
-            with tarfile.open(fileobj=self.tar, mode='r') as tar:
-                self.tarnames = tar.getnames()
+                self.tar = self._save_image()
 
-            if not self.output_path or self.load_image:
+                with tarfile.open(fileobj=self.tar, mode='r') as tar:
+                    self.tarnames = tar.getnames()
+
                 self.squashed_layer = self._squashed_layer()
                 self.layers = [o['Id'] for o in self.docker.history(self.tag)]
                 self.metadata = self.docker.inspect_image(self.tag)

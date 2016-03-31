@@ -217,7 +217,7 @@ class TestAddMarkers(unittest.TestCase):
         self.squash = Image(self.log, self.docker_client, self.image, None)
 
     def test_should_not_fail_with_empty_list_of_markers_to_add(self):
-        self.squash._add_markers({}, None, None, None)
+        self.squash._add_markers({}, None, None)
 
     def test_should_add_all_marker_files_to_empty_tar(self):
         tar = mock.Mock()
@@ -227,7 +227,7 @@ class TestAddMarkers(unittest.TestCase):
 
         markers = {marker_1: 'file'}
         with mock.patch('docker_scripts.image.Image._files_in_layers', return_value={}):
-            self.squash._add_markers(markers, tar, None, None)
+            self.squash._add_markers(markers, tar, None)
 
         self.assertTrue(len(tar.addfile.mock_calls) == 1)
         tar_info, marker_file = tar.addfile.call_args[0]
@@ -244,10 +244,9 @@ class TestAddMarkers(unittest.TestCase):
         type(marker_2).name = mock.PropertyMock(return_value='.wh.marker_2')
 
         markers = {marker_1: 'file1', marker_2: 'file2'}
-        with mock.patch('docker_scripts.image.Image._files_in_layers', return_value={'1234layerdid': ['some/file', 'marker_1']}):
-            self.squash._add_markers(markers, tar, None, None)
+        self.squash._add_markers(markers, tar, {'1234layerdid': ['some/file', 'marker_1']})
 
-        self.assertTrue(len(tar.addfile.mock_calls) == 1)
+        self.assertEqual(len(tar.addfile.mock_calls), 1)
         tar_info, marker_file = tar.addfile.call_args[0]
         self.assertIsInstance(tar_info, tarfile.TarInfo)
         self.assertTrue(marker_file == 'file2')
@@ -262,8 +261,7 @@ class TestAddMarkers(unittest.TestCase):
         type(marker_2).name = mock.PropertyMock(return_value='.wh.marker_2')
 
         markers = {marker_1: 'file1', marker_2: 'file2'}
-        with mock.patch('docker_scripts.image.Image._files_in_layers', return_value={'1234layerdid': ['some/file', 'marker_1', 'marker_2']}):
-            self.squash._add_markers(markers, tar, None, None)
+        self.squash._add_markers(markers, tar, {'1234layerdid': ['some/file', 'marker_1', 'marker_2']})
 
         self.assertTrue(len(tar.addfile.mock_calls) == 0)
 

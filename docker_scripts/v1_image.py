@@ -46,6 +46,8 @@ class V1Image(Image):
         self._generate_repositories_json(
             repositories_file, image_id, self.image_name, self.image_tag)
 
+        return image_id
+
     def _update_squashed_layer_metadata(self, old_json_file, squashed_dir):
         image_id = self._generate_image_id()
 

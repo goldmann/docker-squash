@@ -60,7 +60,7 @@ class Squash(object):
 
         try:
             return self.squash(image)
-        except Exception:
+        except:
             # https://github.com/goldmann/docker-scripts/issues/44
             # If development mode is not enabled, make sure we clean up the
             # temporary directory

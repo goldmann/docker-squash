@@ -29,6 +29,9 @@ class Squash(object):
         if not docker:
             self.docker = common.docker_client()
 
+        if self.output_path:
+            self.load_image = False
+
     def run(self):
         docker_version = self.docker.version()
         self.log.info("docker-scripts version %s, Docker %s, API %s..." %

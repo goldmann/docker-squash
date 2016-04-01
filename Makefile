@@ -37,7 +37,7 @@ prepare: clean
 	@mkdir target
 
 hook-gitter:
-	@curl -s -X POST -H "Content-Type: application/json" -d "{\"payload\":`curl -s -H "Accept: application/json" https://circleci.com/api/v1/project/goldmann/docker-scripts/${CIRCLE_BUILD_NUM}`}" ${GITTER_WEBHOOK_URL}
+	@curl -s -X POST -H "Content-Type: application/json" -d "{\"payload\":`curl -s -H "Accept: application/json" https://circleci.com/api/v1/project/goldmann/docker-squash/${CIRCLE_BUILD_NUM}`}" ${GITTER_WEBHOOK_URL}
 
 release: clean
 	python setup.py clean

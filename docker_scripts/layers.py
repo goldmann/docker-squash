@@ -15,7 +15,7 @@ class Layers(object):
         self.tags = tags
 
         if not docker:
-            self.docker = common.docker_client()
+            self.docker = common.docker_client(self.log)
 
     def _read_layer(self, layers, image_id):
         metadata = self.docker.inspect_image(image_id)

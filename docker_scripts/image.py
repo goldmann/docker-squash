@@ -560,8 +560,10 @@ class Image(object):
                         squashed_files.append(member.name)
 
             # Find all files in layers that we don't squash
-            files_in_layers_to_move = self._files_in_layers(layers_to_move, self.old_image_dir)
+            files_in_layers_to_move = self._files_in_layers(
+                layers_to_move, self.old_image_dir)
 
-            self._add_markers(missed_markers, squashed_tar, files_in_layers_to_move)
+            self._add_markers(missed_markers, squashed_tar,
+                              files_in_layers_to_move)
 
         self.log.info("Squashing finished!")

@@ -71,7 +71,7 @@ class CLI(object):
                 self.log.error(str(e))
 
             self.log.error(
-                "Execution failed, consult logs above. If you think this is our fault, please file an issue: https://github.com/goldmann/docker-scripts/issues, thanks!")
+                "Execution failed, consult logs above. If you think this is our fault, please file an issue: https://github.com/goldmann/docker-squash/issues, thanks!")
 
             sys.exit(1)
 

@@ -9,7 +9,7 @@ import six
 import tarfile
 import tempfile
 
-from docker_scripts.errors import SquashError
+from docker_squash.errors import SquashError
 
 
 class Chdir(object):

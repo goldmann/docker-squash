@@ -5,7 +5,7 @@ import os
 import shutil
 
 from collections import OrderedDict
-from docker_scripts.image import Image
+from docker_squash.image import Image
 
 
 class V2Image(Image):

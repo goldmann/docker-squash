@@ -4,7 +4,7 @@ import docker
 import os
 import requests
 
-from docker_scripts.errors import Error
+from docker_squash.errors import Error
 
 
 DEFAULT_TIMEOUT_SECONDS = 600

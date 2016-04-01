@@ -3,7 +3,7 @@ import os
 import random
 import shutil
 
-from docker_scripts.image import Image
+from docker_squash.image import Image
 
 
 class V1Image(Image):

@@ -4,8 +4,8 @@ import argparse
 import logging
 import sys
 
-from docker_scripts import squash
-from docker_scripts.version import version
+from docker_squash import squash
+from docker_squash.version import version
 
 
 class MyParser(argparse.ArgumentParser):

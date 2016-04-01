@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from setuptools import setup, find_packages
-from docker_scripts.version import version
+from docker_squash.version import version
 
 import codecs
 
@@ -21,7 +21,7 @@ setup(
     keywords = 'docker',
     long_description = codecs.open('README.rst', encoding="utf8").read(),
     entry_points = {
-        'console_scripts': ['docker-scripts=docker_scripts.cli:run'],
+        'console_scripts': ['docker-squash=docker_squash.cli:run'],
     },
     tests_require = ['mock'],
     install_requires=requirements

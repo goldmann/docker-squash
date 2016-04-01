@@ -27,7 +27,7 @@ class Squash(object):
         self.development = development
 
         if not docker:
-            self.docker = common.docker_client()
+            self.docker = common.docker_client(self.log)
 
         if self.output_path:
             self.load_image = False

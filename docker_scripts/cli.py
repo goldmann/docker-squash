@@ -6,7 +6,6 @@ import sys
 
 from docker_scripts import squash, layers
 from docker_scripts.version import version
-from docker_scripts.errors import Error
 
 
 class MyParser(argparse.ArgumentParser):
@@ -89,13 +88,18 @@ class CLI(object):
 
         try:
             args.func(args)
-        except Error as e:
+        except KeyboardInterrupt:
+            self.log.error("Program interrupted by user, exiting...")
+        except:
+            e = sys.exc_info()[1]
+
             if args.development or args.verbose:
                 self.log.exception(e)
             else:
-                self.log.error(e.message)
-                self.log.error(
-                    "Squashing failed, if you think this is our fault, please file an issue: https://github.com/goldmann/docker-scripts/issues, thanks!")
+                self.log.error(str(e))
+
+            self.log.error(
+                "Execution failed, consult logs above. If you think this is our fault, please file an issue: https://github.com/goldmann/docker-scripts/issues, thanks!")
 
             sys.exit(1)
 

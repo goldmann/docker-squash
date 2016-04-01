@@ -15,7 +15,7 @@ some images and/or export more images at the same time -- Docker can fail to pre
 in time and you'll see a timeout. This squash tool will retry (3 times) to fetch it, but sometimes
 you want to make the timeout a bit higher.
 
-## `DOCKER_CONNECTION`
+## `DOCKER_HOST`
 
 Default value: `unix://var/run/docker.sock`
 
@@ -23,3 +23,11 @@ Connection string to the Docker daemon. You will not be required to change this 
 you use default installation of Docker, which creates the socket at `/var/run/docker.sock`.
 If you do use custom Docker daemon settings or connect to a remote Docker daemon --
 update this environment variable.
+
+Previously it used to be named `DOCKER_CONNECTION`. This will still work, but
+it's deprecated and will be removed in future releases.
+
+In case you are on OS X or you are connecting to docker via SSL, you should set
+`DOCKER_HOST`, `DOCKER_TLS_VERIFY`, and `DOCKER_CERT_PATH` variables properly. If
+you\'re using `docker-machine` or `boot2docker` you\'re all set!
+

@@ -4,7 +4,7 @@ general:
 
 machine:
   pre:
-    - make -f docker-scripts/Makefile ci-install-docker
+    - make -f docker-squash/Makefile ci-install-docker
   python:
   services:
     - docker

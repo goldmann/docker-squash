@@ -14,11 +14,11 @@ import io
 from io import BytesIO
 import uuid
 
-from docker_scripts.squash import Squash
-from docker_scripts.errors import SquashError
+from docker_squash.squash import Squash
+from docker_squash.errors import SquashError
 
 if not six.PY3:
-    import docker_scripts.lib.xtarfile
+    import docker_squash.lib.xtarfile
 
 class ImageHelper(object):
     @staticmethod

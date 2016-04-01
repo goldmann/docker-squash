@@ -1,2 +1,2 @@
 ignore-patterns:
-    - docker_scripts/lib/xtarfile.py
+    - docker_squash/lib/xtarfile.py

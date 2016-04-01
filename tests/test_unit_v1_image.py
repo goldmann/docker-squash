@@ -3,10 +3,10 @@ import mock
 import six
 import tarfile
 
-from docker_scripts.squash import Squash
-from docker_scripts.image import Image
-from docker_scripts.v1_image import V1Image
-from docker_scripts.errors import SquashError
+from docker_squash.squash import Squash
+from docker_squash.image import Image
+from docker_squash.v1_image import V1Image
+from docker_squash.errors import SquashError
 
 
 class TestSkippingFiles(unittest.TestCase):
@@ -67,13 +67,13 @@ class TestPrepareTemporaryDirectory(unittest.TestCase):
         self.image = "whatever"
         self.squash = Image(self.log, self.docker_client, self.image, None)
 
-    @mock.patch('docker_scripts.image.tempfile')
+    @mock.patch('docker_squash.image.tempfile')
     def test_create_tmp_directory_if_not_provided(self, mock_tempfile):
         self.squash._prepare_tmp_directory(None)
         mock_tempfile.mkdtemp.assert_called_with(prefix="docker-squash-")
 
-    @mock.patch('docker_scripts.image.tempfile')
-    @mock.patch('docker_scripts.image.os.path.exists', return_value=True)
+    @mock.patch('docker_squash.image.tempfile')
+    @mock.patch('docker_squash.image.os.path.exists', return_value=True)
     def test_should_raise_if_directory_already_exists(self, mock_path, mock_tempfile):
         with self.assertRaises(SquashError) as cm:
             self.squash._prepare_tmp_directory('tmp')
@@ -82,8 +82,8 @@ class TestPrepareTemporaryDirectory(unittest.TestCase):
         mock_path.assert_called_with('tmp')
         self.assertTrue(len(mock_tempfile.mkdtemp.mock_calls) == 0)
 
-    @mock.patch('docker_scripts.image.os.path.exists', return_value=False)
-    @mock.patch('docker_scripts.image.os.makedirs', return_value=False)
+    @mock.patch('docker_squash.image.os.path.exists', return_value=False)
+    @mock.patch('docker_squash.image.os.makedirs', return_value=False)
     def test_should_use_provided_tmp_dir(self, mock_makedirs, mock_path):
         self.assertEqual(self.squash._prepare_tmp_directory('tmp'), 'tmp')
         mock_path.assert_called_with('tmp')
@@ -123,7 +123,7 @@ class TestGenerateV1ImageId(unittest.TestCase):
         self.assertEquals(len(image_id), 64)
         self.assertEquals(isinstance(image_id, str), True)
 
-    @mock.patch('docker_scripts.image.hashlib.sha256')
+    @mock.patch('docker_squash.image.hashlib.sha256')
     def test_should_generate_id_that_is_not_integer_shen_shortened(self, mock_random):
         first_pass = mock.Mock()
         first_pass.hexdigest.return_value = '12683859385754f68e0652f13eb771725feff397144cd60886cb5f9800ed3e22'
@@ -226,7 +226,7 @@ class TestAddMarkers(unittest.TestCase):
         type(marker_1).name = mock.PropertyMock(return_value='.wh.marker_1')
 
         markers = {marker_1: 'file'}
-        with mock.patch('docker_scripts.image.Image._files_in_layers', return_value={}):
+        with mock.patch('docker_squash.image.Image._files_in_layers', return_value={}):
             self.squash._add_markers(markers, tar, None)
 
         self.assertTrue(len(tar.addfile.mock_calls) == 1)

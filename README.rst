@@ -1,22 +1,36 @@
-``docker-scripts``
+``docker-squash``
 ==================
 
-.. image:: https://circleci.com/gh/goldmann/docker-scripts.svg?style=svg
-    :target: https://circleci.com/gh/goldmann/docker-scripts
+.. image:: https://circleci.com/gh/goldmann/docker-squash.svg?style=svg
+    :target: https://circleci.com/gh/goldmann/docker-squash
 
-.. image:: https://landscape.io/github/goldmann/docker-scripts/master/landscape.svg?style=flat
-   :target: https://landscape.io/github/goldmann/docker-scripts/master
+.. image:: https://landscape.io/github/goldmann/docker-squash/master/landscape.svg?style=flat
+   :target: https://landscape.io/github/goldmann/docker-squash/master
 
 .. image:: https://badges.gitter.im/Join%20Chat.svg
-   :target: https://gitter.im/goldmann/docker-scripts
+   :target: https://gitter.im/goldmann/docker-squash
+
+The problem
+-----------
+
+Docker creates many layers while building the image. Sometimes it's not necessary or desireable
+to have them in the image. For example a Dockerfile `ADD` instruction creates a single layer
+with files you want to make available in the image. The problem arises when these files are
+only temporary files (for example product distribution that you want to unpack). Docker will
+carry this unnecessary layer always with the image, even if you delete these files in next
+layer. This a waste of time (more data to push/load/save) and resources (bigger image).
+
+Squashing helps with organizing images in logical layers. Instead of
+having an image with multiple (in almost all cases) unnecessary layers -
+we can control the structure of the image.
 
 Features
 --------
 
-Current list of features:
-
--  Squashing
--  Listing layers in a Docker image
+- Can squash last n layers from an image
+- Can squash from a selected layer to the end (not always possible, depends on the image)
+- Support for Docker 1.9 or newer (older releases may run perfectly fine too, try it!)
+- Squashed image can be loaded back to the Docker daemon or stored as tar archive somewhere
 
 Installation
 ------------
@@ -25,269 +39,179 @@ From source code
 
 ::
 
-    $ git clone https://github.com/goldmann/docker-scripts.git
-    $ cd docker-scripts
-    $ pip install --user .
+    $ pip install --user https://github.com/goldmann/docker-squash/archive/master.zip
 
 From PyPi
 
 ::
 
-    $ pip install docker-scripts
+    $ pip install docker-squash
 
 Usage
 -----
 
 ::
 
-    $ docker-scripts -h
-    usage: docker-scripts [-h] [-v] {squash,layers} ...
+    $ docker-squash -h
+    usage: cli.py [-h] [-v] [--version] [-d] [-f FROM_LAYER] [-t TAG]
+                  [--tmp-dir TMP_DIR] [--output-path OUTPUT_PATH]
+                  image
 
-    Set of helpers scripts fo Docker
-
-    optional arguments:
-      -h, --help       show this help message and exit
-      -v, --verbose    Verbose output
-
-    Available commands:
-      {squash,layers}
-        squash         Squash layers in the specified image
-        layers         Show layers in the specified image
-
-License
--------
-
-MIT
-
-Layers
-------
-
-Simple script to show all the layers of which the image is built.
-
-Layers usage
-~~~~~~~~~~~~
-
-::
-
-    $ docker-scripts layers -h
-    usage: docker-scripts layers [-h] [-c] [-d] [-m] [-t] image
-
-    positional arguments:
-      image             ID of the layer or image ID or image name
-
-    optional arguments:
-      -h, --help        show this help message and exit
-      -c, --commands    Show commands executed to create the layer (if any)
-      -d, --dockerfile  Create Dockerfile out of the layers [EXPERIMENTAL!]
-      -m, --machine     Machine parseable output
-      -t, --tags        Print layer tags if available
-
-Examples
-~~~~~~~~
-
-Default output
-^^^^^^^^^^^^^^
-
-::
-
-    $ docker-scripts layers jboss/wildfly:latest
-    511136ea3c5a64f264b78b5433614aec563103b4d4702f3ba7d4d2698e22c158
-     └─ 782cf93a8f16d3016dae352188cd5cfedb6a15c37d4dbd704399f02d1bb89dab
-      └─ 7d3f07f8de5fb3a20c6cb1e4447773a5741e3641c1aa093366eaa0fc690c6417
-       └─ 1ef0a50fe8b1394d3626a7624a58b58cff9560ddb503743099a56bbe95ab481a
-        └─ 20a1abe1d9bfb9b1e46d5411abd5a38b6104a323b7c4fb5c0f1f161b8f7278c2
-         └─ cd5bb934bb6755e910d19ac3ae4cfd09221aa2f98c3fbb51a7486991364dc1ae
-          └─ 379edb00ab0764276787ea777243990da697f2f93acb5d9166ff73ad01511a87
-           └─ 4d37cbbfc67dd508e682a5431a99d8c1feba1bd8352ffd3ea794463d9cfa81cc
-            └─ 2ea8562cac7c25a308b4565b66d4f7e11a1d2137a599ef2b32ed23c78f0a0378
-             └─ 7759146eab1a3aa5ba5ed12483d03e64a6bf1061a383d5713a5e21fc40554457
-              └─ b17a20d6f5f8e7ed0a1dba277acd3f854c531b0476b03d63a8f0df4caf78c763
-               └─ e02bdb6c4ed5436da02c958d302af5f06c1ebb1821791f60d45e190ebb55130f
-                └─ 72d585299bb5c5c1c326422cfffadc93d8bb4020f35bf072b2d91d287967807a
-                 └─ 90832e1f0bb9e9f98ecd42f6df6b124c1e6768babaddc23d646cd75c7b2fddec
-                  └─ b2b7d0c353b9b7500d23d2670c99abf35c4285a5f396df7ef70386848b45d162
-                   └─ 3759d5cffae63d6ddc9f2db9142403ad39bd54e305bb5060ae860aac9b9dec1d
-                    └─ 5c98b1e90cdcdb322601091f1f8654bc551015caa9ec41da040ef9a1d8466839
-                     └─ 8ac46a315e1ef48cfbe30e9d15242f8f73b322e8ede54c30d93f6859708d48f7
-                      └─ 2ac466861ca121d4c5e17970f4939cc3df3755a7fd90a6d11542b7432c03e215
-
-Output with commands
-^^^^^^^^^^^^^^^^^^^^
-
-::
-
-    $ docker-scripts layers -c jboss/wildfly:latest
-    511136ea3c5a64f264b78b5433614aec563103b4d4702f3ba7d4d2698e22c158
-     └─ 782cf93a8f16d3016dae352188cd5cfedb6a15c37d4dbd704399f02d1bb89dab [/bin/sh -c #(nop) MAINTAINER Lokesh Mandvekar <lsm5@fedoraproject.org> - ./buildcontainers.sh]
-      └─ 7d3f07f8de5fb3a20c6cb1e4447773a5741e3641c1aa093366eaa0fc690c6417 [/bin/sh -c #(nop) ADD file:285fdeab65d637727f6b79392a309135494d2e6046c6cc2fbd2f23e43eaac69c in /]
-       └─ 1ef0a50fe8b1394d3626a7624a58b58cff9560ddb503743099a56bbe95ab481a [/bin/sh -c #(nop) MAINTAINER Marek Goldmann <mgoldman@redhat.com>]
-        └─ 20a1abe1d9bfb9b1e46d5411abd5a38b6104a323b7c4fb5c0f1f161b8f7278c2 [/bin/sh -c yum -y update && yum clean all]
-         └─ cd5bb934bb6755e910d19ac3ae4cfd09221aa2f98c3fbb51a7486991364dc1ae [/bin/sh -c yum -y install xmlstarlet saxon augeas bsdtar unzip && yum clean all]
-          └─ 379edb00ab0764276787ea777243990da697f2f93acb5d9166ff73ad01511a87 [/bin/sh -c groupadd -r jboss -g 1000 && useradd -u 1000 -r -g jboss -m -d /opt/jboss -s /sbin/nologin -c "JBoss user" jboss]
-           └─ 4d37cbbfc67dd508e682a5431a99d8c1feba1bd8352ffd3ea794463d9cfa81cc [/bin/sh -c #(nop) WORKDIR /opt/jboss]
-            └─ 2ea8562cac7c25a308b4565b66d4f7e11a1d2137a599ef2b32ed23c78f0a0378 [/bin/sh -c #(nop) USER jboss]
-             └─ 7759146eab1a3aa5ba5ed12483d03e64a6bf1061a383d5713a5e21fc40554457 [/bin/sh -c #(nop) MAINTAINER Marek Goldmann <mgoldman@redhat.com>]
-              └─ b17a20d6f5f8e7ed0a1dba277acd3f854c531b0476b03d63a8f0df4caf78c763 [/bin/sh -c #(nop) USER root]
-               └─ e02bdb6c4ed5436da02c958d302af5f06c1ebb1821791f60d45e190ebb55130f [/bin/sh -c yum -y install java-1.7.0-openjdk-devel && yum clean all]
-                └─ 72d585299bb5c5c1c326422cfffadc93d8bb4020f35bf072b2d91d287967807a [/bin/sh -c #(nop) USER jboss]
-                 └─ 90832e1f0bb9e9f98ecd42f6df6b124c1e6768babaddc23d646cd75c7b2fddec [/bin/sh -c #(nop) ENV JAVA_HOME=/usr/lib/jvm/java]
-                  └─ b2b7d0c353b9b7500d23d2670c99abf35c4285a5f396df7ef70386848b45d162 [/bin/sh -c #(nop) ENV WILDFLY_VERSION=8.2.0.Final]
-                   └─ 3759d5cffae63d6ddc9f2db9142403ad39bd54e305bb5060ae860aac9b9dec1d [/bin/sh -c cd $HOME && curl http://download.jboss.org/wildfly/$WILDFLY_VERSION/wildfly-$WILDFLY_VERSION.tar.gz | tar zx && mv $HOME/wildfly-$WILDFLY_VERSION $HOME/wildfly]
-                    └─ 5c98b1e90cdcdb322601091f1f8654bc551015caa9ec41da040ef9a1d8466839 [/bin/sh -c #(nop) ENV JBOSS_HOME=/opt/jboss/wildfly]
-                     └─ 8ac46a315e1ef48cfbe30e9d15242f8f73b322e8ede54c30d93f6859708d48f7 [/bin/sh -c #(nop) EXPOSE 8080/tcp]
-                      └─ 2ac466861ca121d4c5e17970f4939cc3df3755a7fd90a6d11542b7432c03e215 [/bin/sh -c #(nop) CMD [/opt/jboss/wildfly/bin/standalone.sh -b 0.0.0.0]]
-
-Machine parseable output
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    $ python layers.py jboss/torquebox -c -m
-    511136ea3c5a64f264b78b5433614aec563103b4d4702f3ba7d4d2698e22c158|
-    ff75b0852d47a18f23ebf57d2ef7974f470a754c534fa44dfb94d5deec69e6c0|/bin/sh -c #(nop) MAINTAINER Lokesh Mandvekar <lsm5@fedoraproject.org> - ./buildcontainers.sh
-    5cc8a068a7372437b21bdb4bafd547cedf4d1ea41fa624aad8df4d8e22ea9ab7|/bin/sh -c #(nop) ADD file:18d3d85c0c8e9ba35d7ae7d1596d97a838ff268a21250819f0fe7278282d1df5 in /
-    e6903a263bcc2c8034ad03691163ecaf3511d211e3855c4667a8390cc1518344|/bin/sh -c yum -y update && yum clean all
-    a6bda5b9c9ba17dda855e787fb3f25e9b4c1f2cb75e41c3121ea001b9f5ea5ab|/bin/sh -c yum -y install java-1.7.0-openjdk-devel unzip && yum clean all
-    ab89a864acfaecf8e69fe26e0fd3177494eb1e7ef468708c8035437577d041f4|/bin/sh -c #(nop) ENV TORQUEBOX_VERSION=3.1.1
-    f267f0b474a2037c3ba0d185f3a7ac20a9b1e1967955745fcd5ee9abb0c5da4c|/bin/sh -c cd /opt && curl -L https://d2t70pdxfgqbmq.cloudfront.net/release/org/torquebox/torquebox-dist/$TORQUEBOX_VERSION/torquebox-dist-$TORQUEBOX_VERSION-bin.zip -o torquebox.zip && unzip -q torquebox.zip && rm torquebox.zip
-    889e1cbf6afb1aec5cd8cd145188c42c06ec4dc7e9c91c67f86b7bb72d9c6979|/bin/sh -c groupadd -r torquebox -g 434 && useradd -u 432 -r -g torquebox -d /opt/torquebox-$TORQUEBOX_VERSION -s /sbin/nologin -c "TorqueBox user" torquebox
-    26d480777a056bc6ddc6f9eb5cb2f5d962eae5aca1880e4a308eef4d8837949b|/bin/sh -c chown -R torquebox:torquebox /opt/torquebox-$TORQUEBOX_VERSION
-    904472e47182e3b34c944cc0a4e9e21a096afd64c913e47f3be314fa023239d7|/bin/sh -c #(nop) EXPOSE map[8080/tcp:{}]
-    4ca0e3ea46ff37e49831c6bb27e9488f48b8db0fc4f6d7eda70bd4a04408daf7|/bin/sh -c #(nop) USER torquebox
-    b621dc5d4989677e62bf8ee0316f557156b5cba2b551e8bbb6368fb5920ae3aa|/bin/sh -c #(nop) CMD [/bin/sh -c /opt/torquebox-$TORQUEBOX_VERSION/jboss/bin/standalone.sh -b 0.0.0.0]
-
-Show tags if available
-~~~~~~~~~~~~~~~~~~~~~~
-
-**NOTE:** Only tags available locally will be shown.
-
-::
-
-    $ docker-scripts layers -t jboss/wildfly:latest
-    511136ea3c5a64f264b78b5433614aec563103b4d4702f3ba7d4d2698e22c158
-     └─ 782cf93a8f16d3016dae352188cd5cfedb6a15c37d4dbd704399f02d1bb89dab
-      └─ 7d3f07f8de5fb3a20c6cb1e4447773a5741e3641c1aa093366eaa0fc690c6417
-       └─ 1ef0a50fe8b1394d3626a7624a58b58cff9560ddb503743099a56bbe95ab481a
-        └─ 20a1abe1d9bfb9b1e46d5411abd5a38b6104a323b7c4fb5c0f1f161b8f7278c2
-         └─ cd5bb934bb6755e910d19ac3ae4cfd09221aa2f98c3fbb51a7486991364dc1ae
-          └─ 379edb00ab0764276787ea777243990da697f2f93acb5d9166ff73ad01511a87
-           └─ 4d37cbbfc67dd508e682a5431a99d8c1feba1bd8352ffd3ea794463d9cfa81cc
-            └─ 2ea8562cac7c25a308b4565b66d4f7e11a1d2137a599ef2b32ed23c78f0a0378 [u'docker.io/jboss/base:latest']
-             └─ 7759146eab1a3aa5ba5ed12483d03e64a6bf1061a383d5713a5e21fc40554457
-              └─ b17a20d6f5f8e7ed0a1dba277acd3f854c531b0476b03d63a8f0df4caf78c763
-               └─ e02bdb6c4ed5436da02c958d302af5f06c1ebb1821791f60d45e190ebb55130f
-                └─ 72d585299bb5c5c1c326422cfffadc93d8bb4020f35bf072b2d91d287967807a
-                 └─ 90832e1f0bb9e9f98ecd42f6df6b124c1e6768babaddc23d646cd75c7b2fddec [u'docker.io/jboss/base-jdk:7']
-                  └─ b2b7d0c353b9b7500d23d2670c99abf35c4285a5f396df7ef70386848b45d162
-                   └─ 3759d5cffae63d6ddc9f2db9142403ad39bd54e305bb5060ae860aac9b9dec1d
-                    └─ 5c98b1e90cdcdb322601091f1f8654bc551015caa9ec41da040ef9a1d8466839
-                     └─ 8ac46a315e1ef48cfbe30e9d15242f8f73b322e8ede54c30d93f6859708d48f7
-                      └─ 2ac466861ca121d4c5e17970f4939cc3df3755a7fd90a6d11542b7432c03e215 [u'docker.io/jboss/wildfly:latest']
-
-Squashing
----------
-
-Squashing... This is a long story. It wasn't merged upstrem despite many
-PR that were opened.
-
-Squashing helps with organizing images in logical layers. Instead of
-having an image with multiple (in almost all cases) unnecessary layers -
-we can control the structure of the image.
-
-Squashing usage
-~~~~~~~~~~~~~~~
-
-::
-
-    $ docker-scripts squash -h
-    usage: docker-scripts squash [-h] [-f FROM_LAYER] [-t TAG] [--tmp-dir TMP_DIR]
-                                 image
+    Docker layer squashing tool
 
     positional arguments:
       image                 Image to be squashed
 
     optional arguments:
       -h, --help            show this help message and exit
+      -v, --verbose         Verbose output
+      --version             Show version and exit
+      -d, --development     Does not clean up after failure for easier debugging
       -f FROM_LAYER, --from-layer FROM_LAYER
                             ID of the layer or image ID or image name. If not
-                            specified will squash up to last layer (FROM
-                            instruction)
+                            specified will squash all layers in the image
       -t TAG, --tag TAG     Specify the tag to be used for the new image. By
                             default it'll be set to 'image' argument
       --tmp-dir TMP_DIR     Temporary directory to be used
+      --output-path OUTPUT_PATH
+                            Path where the image should be stored after squashing.
+                            If not provided, image will be loaded into Docker
+                            daemon
 
-Example
-~~~~~~~
+License
+-------
+
+MIT
+
+Examples
+--------
 
 We start with image like this:
 
 ::
 
-    $ docker-scripts layers -t jboss/wildfly
-    511136ea3c5a64f264b78b5433614aec563103b4d4702f3ba7d4d2698e22c158
-     └─ 782cf93a8f16d3016dae352188cd5cfedb6a15c37d4dbd704399f02d1bb89dab
-      └─ 7d3f07f8de5fb3a20c6cb1e4447773a5741e3641c1aa093366eaa0fc690c6417
-       └─ 1ef0a50fe8b1394d3626a7624a58b58cff9560ddb503743099a56bbe95ab481a
-        └─ 20a1abe1d9bfb9b1e46d5411abd5a38b6104a323b7c4fb5c0f1f161b8f7278c2
-         └─ cd5bb934bb6755e910d19ac3ae4cfd09221aa2f98c3fbb51a7486991364dc1ae
-          └─ 379edb00ab0764276787ea777243990da697f2f93acb5d9166ff73ad01511a87
-           └─ 4d37cbbfc67dd508e682a5431a99d8c1feba1bd8352ffd3ea794463d9cfa81cc
-            └─ 2ea8562cac7c25a308b4565b66d4f7e11a1d2137a599ef2b32ed23c78f0a0378 [u'docker.io/jboss/base:latest']
-             └─ 7759146eab1a3aa5ba5ed12483d03e64a6bf1061a383d5713a5e21fc40554457
-              └─ b17a20d6f5f8e7ed0a1dba277acd3f854c531b0476b03d63a8f0df4caf78c763
-               └─ e02bdb6c4ed5436da02c958d302af5f06c1ebb1821791f60d45e190ebb55130f
-                └─ 72d585299bb5c5c1c326422cfffadc93d8bb4020f35bf072b2d91d287967807a
-                 └─ 90832e1f0bb9e9f98ecd42f6df6b124c1e6768babaddc23d646cd75c7b2fddec [u'docker.io/jboss/base-jdk:7']
-                  └─ b2b7d0c353b9b7500d23d2670c99abf35c4285a5f396df7ef70386848b45d162
-                   └─ 3759d5cffae63d6ddc9f2db9142403ad39bd54e305bb5060ae860aac9b9dec1d
-                    └─ 5c98b1e90cdcdb322601091f1f8654bc551015caa9ec41da040ef9a1d8466839
-                     └─ 8ac46a315e1ef48cfbe30e9d15242f8f73b322e8ede54c30d93f6859708d48f7
-                      └─ 2ac466861ca121d4c5e17970f4939cc3df3755a7fd90a6d11542b7432c03e215 [u'docker.io/jboss/wildfly:latest']
+    $ docker history jboss/wildfly:latest
+    IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
+    25954e6d2300        3 weeks ago         /bin/sh -c #(nop) CMD ["/opt/jboss/wildfly/bi   0 B                 
+    5ae69cb454a5        3 weeks ago         /bin/sh -c #(nop) EXPOSE 8080/tcp               0 B                 
+    dc24712f35c4        3 weeks ago         /bin/sh -c #(nop) ENV LAUNCH_JBOSS_IN_BACKGRO   0 B                 
+    d929129d4c8e        3 weeks ago         /bin/sh -c cd $HOME     && curl -O https://do   160.8 MB            
+    b8fa3caf7d6d        3 weeks ago         /bin/sh -c #(nop) ENV JBOSS_HOME=/opt/jboss/w   0 B                 
+    38b8f85e74bf        3 weeks ago         /bin/sh -c #(nop) ENV WILDFLY_SHA1=c0dd7552c5   0 B                 
+    ae79b646b9a9        3 weeks ago         /bin/sh -c #(nop) ENV WILDFLY_VERSION=10.0.0.   0 B                 
+    2b4606dc9dc7        3 weeks ago         /bin/sh -c #(nop) ENV JAVA_HOME=/usr/lib/jvm/   0 B                 
+    118fa9e33576        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B                 
+    5f7e8f36c3bb        3 weeks ago         /bin/sh -c yum -y install java-1.8.0-openjdk-   197.4 MB            
+    3d4d0228f161        3 weeks ago         /bin/sh -c #(nop) USER [root]                   0 B                 
+    f7ab4ea19708        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B                 
+    4bb15f3b6977        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B                 
+    5dc1e49f4361        3 weeks ago         /bin/sh -c #(nop) WORKDIR /opt/jboss            0 B                 
+    7f0f9eb31174        3 weeks ago         /bin/sh -c groupadd -r jboss -g 1000 && usera   4.349 kB            
+    bd515f044af7        3 weeks ago         /bin/sh -c yum update -y && yum -y install xm   25.18 MB            
+    b78336099045        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B                 
+    4816a298548c        3 weeks ago         /bin/sh -c #(nop) CMD ["/bin/bash"]             0 B                 
+    6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B                 
+    474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB            
+    1544084fad81        6 months ago        /bin/sh -c #(nop) MAINTAINER The CentOS Proje   0 B
 
-And we want to squash all the layers down to ``jboss/base:latest``
-image.
+And we want to squash all the layers down to layer ``4bb15f3b6977``.
 
 ::
 
-    $ docker-scripts squash jboss/wildfly -f jboss/base:latest -t jboss/wildfly:squashed
-    2015-05-11 10:23:35,602 root         INFO     Squashing image 'jboss/wildfly'...
-    2015-05-11 10:23:35,857 root         INFO     Old image has 19 layers
-    2015-05-11 10:23:35,857 root         INFO     Attempting to squash from layer 2ea8562cac7c25a308b4565b66d4f7e11a1d2137a599ef2b32ed23c78f0a0378...
-    2015-05-11 10:23:35,857 root         INFO     Checking if squashing is necessary...
-    2015-05-11 10:23:35,857 root         INFO     We have 10 layers to squash
-    2015-05-11 10:23:35,858 root         INFO     Saving image 2ac466861ca121d4c5e17970f4939cc3df3755a7fd90a6d11542b7432c03e215 to /tmp/tmp-docker-squash-3NmyuU/image.tar file...
-    2015-05-11 10:24:51,357 root         INFO     Image saved!
-    2015-05-11 10:24:51,361 root         INFO     Unpacking /tmp/tmp-docker-squash-3NmyuU/image.tar tar file to /tmp/tmp-docker-squash-3NmyuU/old directory
-    2015-05-11 10:25:09,890 root         INFO     Archive unpacked!
-    2015-05-11 10:25:09,891 root         INFO     New layer ID for squashed content will be: b7e845026f73f67ebeb59ed1958d021aa79c069145d66b1233b7e9ba9fffa729
-    2015-05-11 10:25:09,891 root         INFO     Starting squashing...
-    2015-05-11 10:25:09,891 root         INFO     Squashing layer 2ac466861ca121d4c5e17970f4939cc3df3755a7fd90a6d11542b7432c03e215...
-    2015-05-11 10:25:09,892 root         INFO     Squashing layer 8ac46a315e1ef48cfbe30e9d15242f8f73b322e8ede54c30d93f6859708d48f7...
-    2015-05-11 10:25:09,892 root         INFO     Squashing layer 5c98b1e90cdcdb322601091f1f8654bc551015caa9ec41da040ef9a1d8466839...
-    2015-05-11 10:25:09,893 root         INFO     Squashing layer 3759d5cffae63d6ddc9f2db9142403ad39bd54e305bb5060ae860aac9b9dec1d...
-    2015-05-11 10:25:10,592 root         INFO     Squashing layer b2b7d0c353b9b7500d23d2670c99abf35c4285a5f396df7ef70386848b45d162...
-    2015-05-11 10:25:10,593 root         INFO     Squashing layer 90832e1f0bb9e9f98ecd42f6df6b124c1e6768babaddc23d646cd75c7b2fddec...
-    2015-05-11 10:25:10,594 root         INFO     Squashing layer 72d585299bb5c5c1c326422cfffadc93d8bb4020f35bf072b2d91d287967807a...
-    2015-05-11 10:25:10,594 root         INFO     Squashing layer e02bdb6c4ed5436da02c958d302af5f06c1ebb1821791f60d45e190ebb55130f...
-    2015-05-11 10:25:16,796 root         INFO     Squashing layer b17a20d6f5f8e7ed0a1dba277acd3f854c531b0476b03d63a8f0df4caf78c763...
-    2015-05-11 10:25:16,799 root         INFO     Squashing layer 7759146eab1a3aa5ba5ed12483d03e64a6bf1061a383d5713a5e21fc40554457...
-    2015-05-11 10:25:17,334 root         INFO     Loading squashed image...
-    2015-05-11 10:26:14,505 root         INFO     Image loaded!
-    2015-05-11 10:26:14,720 root         INFO     Finished, image registered as 'jboss/wildfly:squashed'
+    $ docker-squash -f 4bb15f3b6977 -t jboss/wildfly:squashed jboss/wildfly:latest
+    2016-04-01 13:11:02,358 root         INFO     docker-scripts version 1.0.0dev, Docker 7206621, API 1.21...
+    2016-04-01 13:11:02,358 root         INFO     Using v1 image format
+    2016-04-01 13:11:02,374 root         INFO     Old image has 21 layers
+    2016-04-01 13:11:02,378 root         INFO     Checking if squashing is necessary...
+    2016-04-01 13:11:02,378 root         INFO     Attempting to squash last 12 layers...
+    2016-04-01 13:11:02,378 root         INFO     Saving image 25954e6d230006235eecb7f0cc560264d73146985c2d2e663bac953d660b8730 to /tmp/docker-squash-fbxZz4/old/image.tar file...
+    2016-04-01 13:11:08,003 root         INFO     Image saved!
+    2016-04-01 13:11:08,031 root         INFO     Unpacking /tmp/docker-squash-fbxZz4/old/image.tar tar file to /tmp/docker-squash-fbxZz4/old directory
+    2016-04-01 13:11:08,588 root         INFO     Archive unpacked!
+    2016-04-01 13:11:08,636 root         INFO     Squashing image 'jboss/wildfly:latest'...
+    2016-04-01 13:11:08,637 root         INFO     Starting squashing...
+    2016-04-01 13:11:08,637 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/25954e6d230006235eecb7f0cc560264d73146985c2d2e663bac953d660b8730/layer.tar'...
+    2016-04-01 13:11:08,637 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/5ae69cb454a5a542f63e148ce40fb9e01de5bb01805b4ded238841bc2ce8e895/layer.tar'...
+    2016-04-01 13:11:08,637 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/dc24712f35c40e958be8aca2731e7bf8353b9b18baa6a94ad84c6952cbc77004/layer.tar'...
+    2016-04-01 13:11:08,638 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/d929129d4c8e61ea3661eb42c30d01f4c152418689178afc7dc8185a37814528/layer.tar'...
+    2016-04-01 13:11:09,113 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/b8fa3caf7d6dc228bf2499a3af86e5073ad0c17304c3900fa341e9d2fe4e5655/layer.tar'...
+    2016-04-01 13:11:09,115 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/38b8f85e74bfa773a0ad69da2205dc0148945e6f5a7ceb04fa4e8619e1de425b/layer.tar'...
+    2016-04-01 13:11:09,115 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/ae79b646b9a9a287c5f6a01871cc9d9ee596dafee2db942714ca3dea0c06eef3/layer.tar'...
+    2016-04-01 13:11:09,115 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/2b4606dc9dc773aa220a65351fe8d54f03534c58fea230960e95915222366074/layer.tar'...
+    2016-04-01 13:11:09,115 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/118fa9e33576ecc625ebbbfdf2809c1527e716cb4fd5cb40548eb6d3503a75a9/layer.tar'...
+    2016-04-01 13:11:09,115 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/5f7e8f36c3bb20c9db7470a22f828710b4d28aede64966c425add48a1b14fe23/layer.tar'...
+    2016-04-01 13:11:10,127 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/3d4d0228f161b67eb46fdb425ad148c31d9944dcb822f67eac3e2ac2effefc73/layer.tar'...
+    2016-04-01 13:11:10,129 root         INFO     Squashing file '/tmp/docker-squash-fbxZz4/old/f7ab4ea197084ab7483a2ca5409bdcf5473141bfb61b8687b1329943359cc3fe/layer.tar'...
+    2016-04-01 13:11:10,732 root         INFO     Squashing finished!
+    2016-04-01 13:11:10,737 root         INFO     New squashed image ID is 52255e75d3eb83123e074f897e8c971dec9d1168a5c82d7c1496a190da2e40ef
+    2016-04-01 13:11:14,563 root         INFO     Image registered in Docker daemon as jboss/wildfly:squashed
+    2016-04-01 13:11:14,652 root         INFO     Done
 
 We can now confirm the layer structure:
 
 ::
 
-    $ docker-scripts layers -t jboss/wildfly:squashed
-    511136ea3c5a64f264b78b5433614aec563103b4d4702f3ba7d4d2698e22c158
-     └─ 782cf93a8f16d3016dae352188cd5cfedb6a15c37d4dbd704399f02d1bb89dab
-      └─ 7d3f07f8de5fb3a20c6cb1e4447773a5741e3641c1aa093366eaa0fc690c6417
-       └─ 1ef0a50fe8b1394d3626a7624a58b58cff9560ddb503743099a56bbe95ab481a
-        └─ 20a1abe1d9bfb9b1e46d5411abd5a38b6104a323b7c4fb5c0f1f161b8f7278c2
-         └─ cd5bb934bb6755e910d19ac3ae4cfd09221aa2f98c3fbb51a7486991364dc1ae
-          └─ 379edb00ab0764276787ea777243990da697f2f93acb5d9166ff73ad01511a87
-           └─ 4d37cbbfc67dd508e682a5431a99d8c1feba1bd8352ffd3ea794463d9cfa81cc
-            └─ 2ea8562cac7c25a308b4565b66d4f7e11a1d2137a599ef2b32ed23c78f0a0378 [u'docker.io/jboss/base:latest']
-             └─ b7e845026f73f67ebeb59ed1958d021aa79c069145d66b1233b7e9ba9fffa729 [u'jboss/wildfly:squashed']
+    $ docker history jboss/wildfly:squashed
+    IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
+    52255e75d3eb        40 seconds ago                                                      358.2 MB            
+    4bb15f3b6977        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B                 
+    5dc1e49f4361        3 weeks ago         /bin/sh -c #(nop) WORKDIR /opt/jboss            0 B                 
+    7f0f9eb31174        3 weeks ago         /bin/sh -c groupadd -r jboss -g 1000 && usera   4.349 kB            
+    bd515f044af7        3 weeks ago         /bin/sh -c yum update -y && yum -y install xm   25.18 MB            
+    b78336099045        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B                 
+    4816a298548c        3 weeks ago         /bin/sh -c #(nop) CMD ["/bin/bash"]             0 B                 
+    6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B                 
+    474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB            
+    1544084fad81        6 months ago        /bin/sh -c #(nop) MAINTAINER The CentOS Proje   0 B
+
+Other option is to specify how many layers (counting from the newest layer) we want to squash.\
+Let's squash last 10 layers from the ``jboss/wildfly:latest`` image:
+
+::
+
+    $ docker-squash -f 10 -t jboss/wildfly:squashed jboss/wildfly:latest
+    2016-04-01 13:15:06,488 root         INFO     docker-scripts version 1.0.0dev, Docker 7206621, API 1.21...
+    2016-04-01 13:15:06,488 root         INFO     Using v1 image format
+    2016-04-01 13:15:06,504 root         INFO     Old image has 21 layers
+    2016-04-01 13:15:06,504 root         INFO     Checking if squashing is necessary...
+    2016-04-01 13:15:06,504 root         INFO     Attempting to squash last 10 layers...
+    2016-04-01 13:15:06,505 root         INFO     Saving image 25954e6d230006235eecb7f0cc560264d73146985c2d2e663bac953d660b8730 to /tmp/docker-squash-fu80CX/old/image.tar file...
+    2016-04-01 13:15:12,136 root         INFO     Image saved!
+    2016-04-01 13:15:12,167 root         INFO     Unpacking /tmp/docker-squash-fu80CX/old/image.tar tar file to /tmp/docker-squash-fu80CX/old directory
+    2016-04-01 13:15:12,706 root         INFO     Archive unpacked!
+    2016-04-01 13:15:12,756 root         INFO     Squashing image 'jboss/wildfly:latest'...
+    2016-04-01 13:15:12,756 root         INFO     Starting squashing...
+    2016-04-01 13:15:12,756 root         INFO     Squashing file '/tmp/docker-squash-fu80CX/old/25954e6d230006235eecb7f0cc560264d73146985c2d2e663bac953d660b8730/layer.tar'...
+    2016-04-01 13:15:12,757 root         INFO     Squashing file '/tmp/docker-squash-fu80CX/old/5ae69cb454a5a542f63e148ce40fb9e01de5bb01805b4ded238841bc2ce8e895/layer.tar'...
+    2016-04-01 13:15:12,757 root         INFO     Squashing file '/tmp/docker-squash-fu80CX/old/dc24712f35c40e958be8aca2731e7bf8353b9b18baa6a94ad84c6952cbc77004/layer.tar'...
+    2016-04-01 13:15:12,757 root         INFO     Squashing file '/tmp/docker-squash-fu80CX/old/d929129d4c8e61ea3661eb42c30d01f4c152418689178afc7dc8185a37814528/layer.tar'...
+    2016-04-01 13:15:13,234 root         INFO     Squashing file '/tmp/docker-squash-fu80CX/old/b8fa3caf7d6dc228bf2499a3af86e5073ad0c17304c3900fa341e9d2fe4e5655/layer.tar'...
+    2016-04-01 13:15:13,235 root         INFO     Squashing file '/tmp/docker-squash-fu80CX/old/38b8f85e74bfa773a0ad69da2205dc0148945e6f5a7ceb04fa4e8619e1de425b/layer.tar'...
+    2016-04-01 13:15:13,235 root         INFO     Squashing file '/tmp/docker-squash-fu80CX/old/ae79b646b9a9a287c5f6a01871cc9d9ee596dafee2db942714ca3dea0c06eef3/layer.tar'...
+    2016-04-01 13:15:13,235 root         INFO     Squashing file '/tmp/docker-squash-fu80CX/old/2b4606dc9dc773aa220a65351fe8d54f03534c58fea230960e95915222366074/layer.tar'...
+    2016-04-01 13:15:13,236 root         INFO     Squashing file '/tmp/docker-squash-fu80CX/old/118fa9e33576ecc625ebbbfdf2809c1527e716cb4fd5cb40548eb6d3503a75a9/layer.tar'...
+    2016-04-01 13:15:13,236 root         INFO     Squashing file '/tmp/docker-squash-fu80CX/old/5f7e8f36c3bb20c9db7470a22f828710b4d28aede64966c425add48a1b14fe23/layer.tar'...
+    2016-04-01 13:15:14,848 root         INFO     Squashing finished!
+    2016-04-01 13:15:14,853 root         INFO     New squashed image ID is fde7edd2e5683c97bedf9c0bf52ad5150db5650e421de3d9293ce5223b256455
+    2016-04-01 13:15:18,963 root         INFO     Image registered in Docker daemon as jboss/wildfly:squashed
+    2016-04-01 13:15:19,059 root         INFO     Done
+
+Let's confirm the image structure now:
+
+::
+
+    $ docker history jboss/wildfly:squashed
+    IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
+    fde7edd2e568        32 seconds ago                                                      358.2 MB            
+    3d4d0228f161        3 weeks ago         /bin/sh -c #(nop) USER [root]                   0 B                 
+    f7ab4ea19708        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B                 
+    4bb15f3b6977        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B                 
+    5dc1e49f4361        3 weeks ago         /bin/sh -c #(nop) WORKDIR /opt/jboss            0 B                 
+    7f0f9eb31174        3 weeks ago         /bin/sh -c groupadd -r jboss -g 1000 && usera   4.349 kB            
+    bd515f044af7        3 weeks ago         /bin/sh -c yum update -y && yum -y install xm   25.18 MB            
+    b78336099045        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B                 
+    4816a298548c        3 weeks ago         /bin/sh -c #(nop) CMD ["/bin/bash"]             0 B                 
+    6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B                 
+    474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB            
+    1544084fad81        6 months ago        /bin/sh -c #(nop) MAINTAINER The CentOS Proje   0 B
 

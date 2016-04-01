@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import os
-import six
 
 from distutils.version import StrictVersion
 
-from docker_scripts.v1_image import V1Image
-from docker_scripts.v2_image import V2Image
-from docker_scripts.lib import common
-from docker_scripts.errors import SquashError
-from docker_scripts.version import version
+from docker_squash.v1_image import V1Image
+from docker_squash.v2_image import V2Image
+from docker_squash.lib import common
+from docker_squash.errors import SquashError
+from docker_squash.version import version
 
 
 class Squash(object):

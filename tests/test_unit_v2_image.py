@@ -4,9 +4,9 @@ import six
 import tarfile
 
 from collections import OrderedDict
-from docker_scripts.v2_image import V2Image
-from docker_scripts.image import Image
-from docker_scripts.errors import SquashError
+from docker_squash.v2_image import V2Image
+from docker_squash.image import Image
+from docker_squash.errors import SquashError
 
 
 class TestReadingConfigFiles(unittest.TestCase):

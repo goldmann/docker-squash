@@ -33,7 +33,7 @@ class Squash(object):
 
     def run(self):
         docker_version = self.docker.version()
-        self.log.info("docker-scripts version %s, Docker %s, API %s..." %
+        self.log.info("docker-squash version %s, Docker %s, API %s..." %
                       (version, docker_version['GitCommit'], docker_version['ApiVersion']))
 
         if self.image is None:

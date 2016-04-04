@@ -269,7 +269,7 @@ class Image(object):
 
         with open(tar_file, 'rb') as f:
             self.log.debug("Loading squashed image...")
-            self.docker.load_image(f.read())
+            self.docker.load_image(f)
             self.log.debug("Image loaded!")
 
         os.remove(tar_file)

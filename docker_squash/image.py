@@ -11,6 +11,9 @@ import tempfile
 
 from docker_squash.errors import SquashError
 
+if not six.PY3:
+    import docker_squash.lib.xtarfile
+
 
 class Chdir(object):
 

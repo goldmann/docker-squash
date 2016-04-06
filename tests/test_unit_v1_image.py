@@ -164,6 +164,10 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
                 str(cm.exception), 'Provided image id cannot be null')
             mock_file().write.assert_not_called()
 
+    def test_should_not_generate_repositories_if_name_and_tag_is_missing(self):
+        self.squash._generate_repositories_json('file', 'abcd', None, None)
+        self.log.debug.assert_called_with("No name and tag provided for the image, skipping generating repositories file")
+
 
 class TestMarkerFiles(unittest.TestCase):
 

@@ -30,7 +30,8 @@ class ImageHelper(object):
             repositories_member = tar.getmember('repositories')
             repositories = json.load(reader(tar.extractfile(repositories_member)))
             return repositories.popitem()[1].popitem()[1]
-        else:
+
+        if 'manifest.json' in tar.getnames():
             manifest_member = tar.getmember('manifest.json')
             manifest = json.load(reader(tar.extractfile(manifest_member)))
             return manifest[0]["Layers"][-1].split("/")[0]
@@ -102,12 +103,15 @@ class IntegSquash(unittest.TestCase):
 
     class SquashedImage(object):
 
-        def __init__(self, image, number_of_layers=None, output_path=None, load_image=True, numeric=False, tmp_dir=None, log=None, development=False):
+        def __init__(self, image, number_of_layers=None, output_path=None, load_image=True, numeric=False, tmp_dir=None, log=None, development=False, tag=True):
             self.image = image
             self.number_of_layers = number_of_layers
             self.docker = TestIntegSquash.docker
             self.log = log or TestIntegSquash.log
-            self.tag = "%s:squashed" % self.image.name
+            if tag:
+                self.tag = "%s:squashed" % self.image.name
+            else:
+                self.tag = None
             self.output_path = output_path
             self.load_image = load_image
             self.numeric = numeric
@@ -128,22 +132,23 @@ class IntegSquash(unittest.TestCase):
             self.image_id = squash.run()
 
             if not self.output_path:
-                self.history = self.docker.history(self.tag)
+                self.history = self.docker.history(self.image_id)
 
-                self.tar = self._save_image()
+                if self.tag:
+                    self.tar = self._save_image()
 
-                with tarfile.open(fileobj=self.tar, mode='r') as tar:
-                    self.tarnames = tar.getnames()
+                    with tarfile.open(fileobj=self.tar, mode='r') as tar:
+                        self.tarnames = tar.getnames()
 
-                self.squashed_layer = self._squashed_layer()
-                self.layers = [o['Id'] for o in self.docker.history(self.tag)]
-                self.metadata = self.docker.inspect_image(self.tag)
+                    self.squashed_layer = self._squashed_layer()
+                    self.layers = [o['Id'] for o in self.docker.history(self.image_id)]
+                    self.metadata = self.docker.inspect_image(self.image_id)
 
             return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):
             if not (os.getenv('CI') or self.output_path):
-                self.docker.remove_image(image=self.tag, force=True)
+                self.docker.remove_image(image=self.image_id, force=True)
 
         def _save_image(self):
             image = self.docker.get_image(self.tag)
@@ -653,6 +658,17 @@ class TestIntegSquash(IntegSquash):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, None):
+                pass
+
+    # https://github.com/goldmann/docker-squash/issues/66
+    def test_build_without_tag(self):
+        dockerfile = '''
+        FROM %s
+        RUN touch file
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, None, tag=False):
                 pass
 
 

@@ -143,7 +143,8 @@ class Image(object):
         # Location of the tar archive with squashed layers
         self.squashed_tar = os.path.join(self.squashed_dir, "layer.tar")
 
-        self.image_name, self.image_tag = self._parse_image_name(self.tag)
+        if self.tag:
+            self.image_name, self.image_tag = self._parse_image_name(self.tag)
 
         # The image id or name of the image to be squashed
         try:
@@ -228,8 +229,10 @@ class Image(object):
 
     def load_squashed_image(self):
         self._load_image(self.new_image_dir)
-        self.log.info("Image registered in Docker daemon as %s:%s" %
-                      (self.image_name, self.image_tag))
+
+        if self.tag:
+            self.log.info("Image registered in Docker daemon as %s:%s" %
+                          (self.image_name, self.image_tag))
 
     def _files_in_layers(self, layers, directory):
         """
@@ -391,6 +394,10 @@ class Image(object):
     def _generate_repositories_json(self, repositories_file, image_id, name, tag):
         if not image_id:
             raise SquashError("Provided image id cannot be null")
+
+        if name == tag == None:
+            self.log.debug("No name and tag provided for the image, skipping generating repositories file")
+            return
 
         repos = {}
         repos[name] = {}

@@ -643,6 +643,18 @@ class TestIntegSquash(IntegSquash):
 
         self.assertTrue(os.path.exists(tmp_dir))
 
+    # https://github.com/goldmann/docker-squash/issues/80
+    def test_should_not_fail_with_hard_links(self):
+        dockerfile = '''
+        FROM %s
+        RUN touch /file && ln file link
+        RUN rm file
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, None):
+                pass
+
 
 class NumericValues(IntegSquash):
     @classmethod

@@ -561,6 +561,10 @@ class Image(object):
                         if member.issym():
                             # Special case: symlinks
                             squashed_tar.addfile(member)
+                        elif member.islnk():
+                            if member.linkname in to_skip:
+                                self.log.debug("Found a hard link to a file which is marked to be skipped: %s, skipping hard link too" % member.linkname)
+                                to_skip.append(member.name)
                         else:
                             # Finally add the file to archive
                             squashed_tar.addfile(
@@ -569,11 +573,12 @@ class Image(object):
                         # We added a file to the squashed tar, so let's note it
                         squashed_files.append(member.name)
 
-            # Find all files in layers that we don't squash
-            files_in_layers_to_move = self._files_in_layers(
-                layers_to_move, self.old_image_dir)
+            if layers_to_move:
+                # Find all files in layers that we don't squash
+                files_in_layers_to_move = self._files_in_layers(
+                    layers_to_move, self.old_image_dir)
 
-            self._add_markers(missed_markers, squashed_tar,
-                              files_in_layers_to_move)
+                self._add_markers(missed_markers, squashed_tar,
+                                  files_in_layers_to_move)
 
         self.log.info("Squashing finished!")

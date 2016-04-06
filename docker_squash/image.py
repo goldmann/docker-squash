@@ -321,7 +321,14 @@ class Image(object):
                 image = self.docker.get_image(image_id)
 
                 with open(tar_file, 'wb') as f:
-                    f.write(image.data)
+                    while True:
+                        # Read about 10 MB of the tar archive
+                        data = image.read(1024000)
+
+                        if not data:
+                            break
+
+                        f.write(data)
 
                 self.log.info("Image saved!")
                 return True

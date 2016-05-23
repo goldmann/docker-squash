@@ -593,16 +593,17 @@ class TestIntegSquash(IntegSquash):
     # at least one <missing> layer
     def test_should_squash_every_layer(self):
         dockerfile = '''
-        FROM busybox:1.24.0
+        FROM %s
         RUN touch /tmp/test1
         RUN touch /tmp/test2
         CMD /bin/env
         LABEL foo bar
-        '''
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image) as squashed_image:
-                pass
+                self.assertEqual(
+                    len(squashed_image.layers), 1)
 
     # https://github.com/goldmann/docker-scripts/issues/44
     def test_remove_tmp_dir_after_failure(self):
@@ -670,6 +671,16 @@ class TestIntegSquash(IntegSquash):
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, None, tag=False):
                 pass
+
+    def test_should_squash_every_layer_from_an_image_from_docker_hub(self):
+        dockerfile = '''
+        FROM python:3.5.1-alpine
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image) as squashed_image:
+                self.assertEqual(
+                    len(squashed_image.layers), 1)
 
 
 class NumericValues(IntegSquash):

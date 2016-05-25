@@ -672,6 +672,24 @@ class TestIntegSquash(IntegSquash):
             with self.SquashedImage(image, None, tag=False):
                 pass
 
+    # https://github.com/goldmann/docker-squash/issues/94
+    def test_should_squash_correctly_hardlinks(self):
+        dockerfile = '''
+        FROM %s
+        RUN mkdir -p /usr/libexec/git-core && \
+            echo foo > /usr/libexec/git-core/git-remote-ftp && \
+            ln /usr/libexec/git-core/git-remote-ftp \
+            /usr/libexec/git-core/git-remote-http
+        CMD /bin/bash
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 3) as squashed_image:
+                self.assertEqual(
+                    len(squashed_image.layers), len(image.layers) - 2)
+                squashed_image.assertFileExists('usr/libexec/git-core/git-remote-ftp')
+                squashed_image.assertFileExists('usr/libexec/git-core/git-remote-http')
+
     def test_should_squash_every_layer_from_an_image_from_docker_hub(self):
         dockerfile = '''
         FROM python:3.5.1-alpine

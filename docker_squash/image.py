@@ -565,19 +565,19 @@ class Image(object):
                                 "Skipping '%s' file because it's older than file already added to the archive" % member.name)
                             continue
 
-                        # Special case: symlinks, we skip the file itself
-                        if member.issym():
-                            squashed_tar.addfile(member)
-
                         # Special case: hard links to files that were already removed
                         if member.islnk() and member.linkname in to_skip:
                             self.log.debug("Found a hard link to a file which is marked to be skipped: %s, skipping hard link too" % member.linkname)
                             to_skip.append(member.name)
                             continue
 
-                        # Finally add the file to archive
-                        squashed_tar.addfile(
-                            member, layer_tar.extractfile(member))
+                        if member.isfile():
+                            # Finally add the file to archive
+                            squashed_tar.addfile(
+                                member, layer_tar.extractfile(member))
+                        else:
+                            # Special cases: symlinks and hard links, and other files, we skip the file itself
+                            squashed_tar.addfile(member)
 
                         # We added a file to the squashed tar, so let's note it
                         squashed_files.append(member.name)

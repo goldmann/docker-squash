@@ -12,6 +12,9 @@ machine:
     CI: true
 
 dependencies:
+  override:
+    - pip install tox tox-pyenv docker-py>=1.7.2 six
+    - pyenv local 2.7.11 3.4.4 3.5.1
   post:
     - docker version
     - docker info
@@ -23,6 +26,8 @@ test:
     - make test-py27:
         parallel: true
     - make test-py34:
+        parallel: true
+    - make test-py35:
         parallel: true
   post:
     - make ci-publish-junit

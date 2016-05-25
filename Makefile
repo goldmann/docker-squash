@@ -9,6 +9,9 @@ test-py27: prepare
 test-py34: prepare
 	tox -e py34 -- tests
 
+test-py35: prepare
+	tox -e py35 -- tests
+
 test-unit: prepare
 	tox -- tests/test_unit*
 

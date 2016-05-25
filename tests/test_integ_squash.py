@@ -684,7 +684,7 @@ class TestIntegSquash(IntegSquash):
         ''' % TestIntegSquash.BUSYBOX_IMAGE
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(image, 3) as squashed_image:
+            with self.SquashedImage(image, 3, numeric=True) as squashed_image:
                 self.assertEqual(
                     len(squashed_image.layers), len(image.layers) - 2)
                 squashed_image.assertFileExists('usr/libexec/git-core/git-remote-ftp')

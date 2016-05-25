@@ -22,7 +22,7 @@ test:
   override:
     - make test-py27:
         parallel: true
-    - make test-py34:
+    - make test-py35:
         parallel: true
   post:
     - make ci-publish-junit

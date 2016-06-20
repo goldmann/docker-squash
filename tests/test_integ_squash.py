@@ -432,7 +432,7 @@ class TestIntegSquash(IntegSquash):
         ''' % TestIntegSquash.BUSYBOX_IMAGE
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(image, 2) as squashed_image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
                 squashed_image.assertFileDoesNotExist('some/dir/tree/file1')
                 squashed_image.assertFileDoesNotExist('some/dir/tree/file2')
                 squashed_image.assertFileExists('some/dir/file1')
@@ -451,6 +451,31 @@ class TestIntegSquash(IntegSquash):
                     # We should have one layer less in the image
                     self.assertEqual(
                         len(squashed_image.layers), len(image.layers) - 1)
+
+    # https://github.com/goldmann/docker-squash/issues/97
+    def test_should_leave_whiteout_entries_as_is(self):
+        dockerfile = '''
+        FROM %s
+        RUN mkdir -p /opt/test/one
+        RUN mkdir -p /opt/test/two
+        RUN touch /opt/test/one/file
+        RUN touch /opt/test/two/file
+        RUN rm -rvf /opt/test/on*
+        RUN rm -rvf /opt/test/tw*
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
+                squashed_image.assertFileDoesNotExist('opt/test/one/file')
+                squashed_image.assertFileDoesNotExist('opt/test/two/file')
+                squashed_image.assertFileExists('opt/test')
+                squashed_image.assertFileExists('opt/test/.wh.one')
+                squashed_image.assertFileExists('opt/test/.wh.two')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileDoesNotExist('opt/test/one/file')
+                    container.assertFileDoesNotExist('opt/test/two/file')
+                    container.assertFileExists('opt/test')
 
     # https://github.com/goldmann/docker-scripts/issues/28
     def test_docker_version_in_metadata_should_be_set_after_squashing(self):

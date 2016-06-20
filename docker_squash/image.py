@@ -440,8 +440,8 @@ class Image(object):
             self.log.debug("Moving unmodified layer '%s'..." % layer_id)
             shutil.move(os.path.join(src, layer_id), dest)
 
-    def _file_should_be_skipped(self, file_name, skipped_paths):
-        for file_path in skipped_paths:
+    def _file_should_be_skipped(self, file_name, file_paths):
+        for file_path in file_paths:
             if file_name == file_path or file_name.startswith(file_path + "/"):
                 return True
 
@@ -481,13 +481,20 @@ class Image(object):
             # No marker files to add
             return
 
+        tar_files = tar.getnames()
+
         for marker, marker_file in six.iteritems(markers):
             actual_file = marker.name.replace('.wh.', '')
             should_be_added_back = False
 
+            if actual_file in tar_files:
+                self.log.debug(
+                    "Skipping '%s' marker file, this file was added earlier for some reason..." % marker.name)
+                continue
+
             if files_in_layers:
                 for files in files_in_layers.values():
-                    if not self._file_should_be_skipped(actual_file, files):
+                    if self._file_should_be_skipped(actual_file, files):
                         should_be_added_back = True
                         break
             else:
@@ -503,6 +510,9 @@ class Image(object):
                 # regular files, therefore we need to recreate the tarinfo
                 # object
                 tar.addfile(tarfile.TarInfo(name=marker.name), marker_file)
+                # Add the file name to the list too to avoid re-reading all files
+                # in tar archive
+                tar_files.append(actual_file)
             else:
                 self.log.debug(
                     "Skipping '%s' marker file..." % marker.name)
@@ -516,7 +526,7 @@ class Image(object):
 
         with tarfile.open(self.squashed_tar, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
             to_skip = []
-            missed_markers = {}
+            skipped_markers = {}
             # List of filenames in the squashed archive
             squashed_files = []
 
@@ -539,16 +549,16 @@ class Image(object):
                     # to the marker file is found, then skip both files
                     for marker, marker_file in six.iteritems(markers):
                         actual_file = marker.name.replace('.wh.', '')
-                        to_skip.append(marker.name)
                         to_skip.append(actual_file)
-
-                        if not self._file_should_be_skipped(actual_file, squashed_files):
-                            self.log.debug(
-                                "Marker file '%s' not found in the squashed files, we'll try at the end of squashing one more time" % marker.name)
-                            missed_markers[marker] = marker_file
+                        skipped_markers[marker] = marker_file
 
                     # Copy all the files to the new tar
                     for member in members:
+                        if member in skipped_markers.keys():
+                            self.log.debug(
+                                "Skipping '%s' marker file, at the end of squashing we'll see if it's necessary to add it back" % member.name)
+                            continue
+
                         # Skip files that are marked to be skipped
                         if self._file_should_be_skipped(member.name, to_skip):
                             self.log.debug(
@@ -587,7 +597,7 @@ class Image(object):
                 files_in_layers_to_move = self._files_in_layers(
                     layers_to_move, self.old_image_dir)
 
-                self._add_markers(missed_markers, squashed_tar,
+                self._add_markers(skipped_markers, squashed_tar,
                                   files_in_layers_to_move)
 
         self.log.info("Squashing finished!")

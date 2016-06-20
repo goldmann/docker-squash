@@ -760,19 +760,35 @@ class NumericValues(IntegSquash):
 
     def test_should_squash_2_layers(self):
         with self.SquashedImage(NumericValues.image, 2, numeric=True) as squashed_image:
-            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
+
+            i_h = NumericValues.image.history[0]
+            s_h = squashed_image.history[0]
+
+            for key in 'Comment', 'Size':
+                self.assertEqual(i_h[key], s_h[key])
+            self.assertEqual(s_h['CreatedBy'], '')
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 1)
 
     def test_should_squash_3_layers(self):
         with self.SquashedImage(NumericValues.image, 3, numeric=True) as squashed_image:
-            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
+            i_h = NumericValues.image.history[0]
+            s_h = squashed_image.history[0]
+
+            for key in 'Comment', 'Size':
+                self.assertEqual(i_h[key], s_h[key])
+            self.assertEqual(s_h['CreatedBy'], '')
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 2)
 
     def test_should_squash_4_layers(self):
         with self.SquashedImage(NumericValues.image, 4, numeric=True) as squashed_image:
-            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
+            i_h = NumericValues.image.history[0]
+            s_h = squashed_image.history[0]
+
+            for key in 'Comment', 'Size':
+                self.assertEqual(i_h[key], s_h[key])
+            self.assertEqual(s_h['CreatedBy'], '')
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 3)
 

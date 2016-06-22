@@ -456,26 +456,35 @@ class TestIntegSquash(IntegSquash):
     def test_should_leave_whiteout_entries_as_is(self):
         dockerfile = '''
         FROM %s
-        RUN mkdir -p /opt/test/one
-        RUN mkdir -p /opt/test/two
-        RUN touch /opt/test/one/file
-        RUN touch /opt/test/two/file
-        RUN rm -rvf /opt/test/on*
-        RUN rm -rvf /opt/test/tw*
+        RUN mkdir -p /opt/test.one
+        RUN mkdir -p /opt/test.two
+        RUN mkdir -p /opt/foo
+        RUN touch /opt/test.one/file
+        RUN touch /opt/test.two/file
+        RUN touch /opt/foo/file
+        RUN rm -rvf /opt/test*/*
+        RUN rm -rvf /opt/foo/*
         ''' % TestIntegSquash.BUSYBOX_IMAGE
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2, numeric=True) as squashed_image:
-                squashed_image.assertFileDoesNotExist('opt/test/one/file')
-                squashed_image.assertFileDoesNotExist('opt/test/two/file')
-                squashed_image.assertFileExists('opt/test')
-                squashed_image.assertFileExists('opt/test/.wh.one')
-                squashed_image.assertFileExists('opt/test/.wh.two')
+                squashed_image.assertFileDoesNotExist('opt/test.one/file')
+                squashed_image.assertFileDoesNotExist('opt/test.two/file')
+                squashed_image.assertFileDoesNotExist('opt/foo/file')
+                squashed_image.assertFileExists('opt/test.one')
+                squashed_image.assertFileExists('opt/test.two')
+                squashed_image.assertFileExists('opt/foo')
+                squashed_image.assertFileExists('opt/test.one/.wh.file')
+                squashed_image.assertFileExists('opt/test.two/.wh.file')
+                squashed_image.assertFileExists('opt/foo/.wh.file')
 
                 with self.Container(squashed_image) as container:
-                    container.assertFileDoesNotExist('opt/test/one/file')
-                    container.assertFileDoesNotExist('opt/test/two/file')
-                    container.assertFileExists('opt/test')
+                    container.assertFileDoesNotExist('opt/test.one/file')
+                    container.assertFileDoesNotExist('opt/test.two/file')
+                    container.assertFileDoesNotExist('opt/foo/file')
+                    container.assertFileExists('opt/foo')
+                    container.assertFileExists('opt/test.one')
+                    container.assertFileExists('opt/test.two')
 
     # https://github.com/goldmann/docker-scripts/issues/28
     def test_docker_version_in_metadata_should_be_set_after_squashing(self):

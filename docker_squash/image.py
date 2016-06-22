@@ -494,7 +494,7 @@ class Image(object):
 
             if files_in_layers:
                 for files in files_in_layers.values():
-                    if self._file_should_be_skipped(actual_file, files):
+                    if actual_file in files or "%s/" % actual_file in files:
                         should_be_added_back = True
                         break
             else:

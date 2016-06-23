@@ -432,7 +432,7 @@ class TestIntegSquash(IntegSquash):
         ''' % TestIntegSquash.BUSYBOX_IMAGE
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(image, 2) as squashed_image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
                 squashed_image.assertFileDoesNotExist('some/dir/tree/file1')
                 squashed_image.assertFileDoesNotExist('some/dir/tree/file2')
                 squashed_image.assertFileExists('some/dir/file1')
@@ -451,6 +451,40 @@ class TestIntegSquash(IntegSquash):
                     # We should have one layer less in the image
                     self.assertEqual(
                         len(squashed_image.layers), len(image.layers) - 1)
+
+    # https://github.com/goldmann/docker-squash/issues/97
+    def test_should_leave_whiteout_entries_as_is(self):
+        dockerfile = '''
+        FROM %s
+        RUN mkdir -p /opt/test.one
+        RUN mkdir -p /opt/test.two
+        RUN mkdir -p /opt/foo
+        RUN touch /opt/test.one/file
+        RUN touch /opt/test.two/file
+        RUN touch /opt/foo/file
+        RUN rm -rvf /opt/test*/*
+        RUN rm -rvf /opt/foo/*
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
+                squashed_image.assertFileDoesNotExist('opt/test.one/file')
+                squashed_image.assertFileDoesNotExist('opt/test.two/file')
+                squashed_image.assertFileDoesNotExist('opt/foo/file')
+                squashed_image.assertFileExists('opt/test.one')
+                squashed_image.assertFileExists('opt/test.two')
+                squashed_image.assertFileExists('opt/foo')
+                squashed_image.assertFileExists('opt/test.one/.wh.file')
+                squashed_image.assertFileExists('opt/test.two/.wh.file')
+                squashed_image.assertFileExists('opt/foo/.wh.file')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileDoesNotExist('opt/test.one/file')
+                    container.assertFileDoesNotExist('opt/test.two/file')
+                    container.assertFileDoesNotExist('opt/foo/file')
+                    container.assertFileExists('opt/foo')
+                    container.assertFileExists('opt/test.one')
+                    container.assertFileExists('opt/test.two')
 
     # https://github.com/goldmann/docker-scripts/issues/28
     def test_docker_version_in_metadata_should_be_set_after_squashing(self):
@@ -735,19 +769,35 @@ class NumericValues(IntegSquash):
 
     def test_should_squash_2_layers(self):
         with self.SquashedImage(NumericValues.image, 2, numeric=True) as squashed_image:
-            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
+
+            i_h = NumericValues.image.history[0]
+            s_h = squashed_image.history[0]
+
+            for key in 'Comment', 'Size':
+                self.assertEqual(i_h[key], s_h[key])
+            self.assertEqual(s_h['CreatedBy'], '')
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 1)
 
     def test_should_squash_3_layers(self):
         with self.SquashedImage(NumericValues.image, 3, numeric=True) as squashed_image:
-            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
+            i_h = NumericValues.image.history[0]
+            s_h = squashed_image.history[0]
+
+            for key in 'Comment', 'Size':
+                self.assertEqual(i_h[key], s_h[key])
+            self.assertEqual(s_h['CreatedBy'], '')
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 2)
 
     def test_should_squash_4_layers(self):
         with self.SquashedImage(NumericValues.image, 4, numeric=True) as squashed_image:
-            self.assertEqual(squashed_image.history[-1], NumericValues.image.history[-1])
+            i_h = NumericValues.image.history[0]
+            s_h = squashed_image.history[0]
+
+            for key in 'Comment', 'Size':
+                self.assertEqual(i_h[key], s_h[key])
+            self.assertEqual(s_h['CreatedBy'], '')
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 3)
 

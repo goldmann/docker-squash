@@ -225,13 +225,13 @@ class TestAddMarkers(unittest.TestCase):
 
     def test_should_add_all_marker_files_to_empty_tar(self):
         tar = mock.Mock()
+        tar.getnames.return_value = []
 
         marker_1 = mock.Mock()
         type(marker_1).name = mock.PropertyMock(return_value='.wh.marker_1')
 
         markers = {marker_1: 'file'}
-        with mock.patch('docker_squash.image.Image._files_in_layers', return_value={}):
-            self.squash._add_markers(markers, tar, None)
+        self.squash._add_markers(markers, tar, {})
 
         self.assertTrue(len(tar.addfile.mock_calls) == 1)
         tar_info, marker_file = tar.addfile.call_args[0]
@@ -241,23 +241,28 @@ class TestAddMarkers(unittest.TestCase):
 
     def test_should_skip_a_marker_file_if_file_is_in_unsquashed_layers(self):
         tar = mock.Mock()
+        # List of files in the squashed tar
+        tar.getnames.return_value = ['marker_1']
 
         marker_1 = mock.Mock()
         type(marker_1).name = mock.PropertyMock(return_value='.wh.marker_1')
         marker_2 = mock.Mock()
         type(marker_2).name = mock.PropertyMock(return_value='.wh.marker_2')
+        # List of marker files to add back
+        markers = {marker_1: 'marker_1', marker_2: 'marker_2'}
+        # List of files in all layers to be moved
+        files_in_moved_layers = {'1234layerdid': ['some/file', 'marker_2']}
+        self.squash._add_markers(markers, tar, files_in_moved_layers)
 
-        markers = {marker_1: 'file1', marker_2: 'file2'}
-        self.squash._add_markers(markers, tar, {'1234layerdid': ['some/file', 'marker_1']})
-
-        self.assertEqual(len(tar.addfile.mock_calls), 1)
+        self.assertTrue(len(tar.addfile.mock_calls) == 1)
         tar_info, marker_file = tar.addfile.call_args[0]
         self.assertIsInstance(tar_info, tarfile.TarInfo)
-        self.assertTrue(marker_file == 'file2')
+        self.assertTrue(marker_file == 'marker_2')
         self.assertTrue(tar_info.isfile())
 
     def test_should_not_add_any_marker_files(self):
         tar = mock.Mock()
+        tar.getnames.return_value = ['marker_1', 'marker_2']
 
         marker_1 = mock.Mock()
         type(marker_1).name = mock.PropertyMock(return_value='.wh.marker_1')

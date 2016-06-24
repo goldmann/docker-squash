@@ -62,6 +62,7 @@ class CLI(object):
                           from_layer=args.from_layer, tag=args.tag, output_path=args.output_path, tmp_dir=args.tmp_dir, development=args.development).run()
         except KeyboardInterrupt:
             self.log.error("Program interrupted by user, exiting...")
+            sys.exit(1)
         except:
             e = sys.exc_info()[1]
 

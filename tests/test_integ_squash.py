@@ -695,6 +695,19 @@ class TestIntegSquash(IntegSquash):
             with self.SquashedImage(image, None):
                 pass
 
+    # https://github.com/goldmann/docker-squash/issues/99
+    # TODO: try not to use centos:6.6 image - this slows down testsuite
+    def test_should_not_fail_with_hard_links_to_files_gh_99(self):
+        dockerfile = '''
+        FROM centos:6.6
+        RUN yum -y update bind-utils
+        RUN yum clean all
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, None):
+                pass
+
     # https://github.com/goldmann/docker-squash/issues/66
     def test_build_without_tag(self):
         dockerfile = '''

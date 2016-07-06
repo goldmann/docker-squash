@@ -527,6 +527,7 @@ class Image(object):
         with tarfile.open(self.squashed_tar, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
             to_skip = []
             skipped_markers = {}
+            skipped_hard_links = []
             # List of filenames in the squashed archive
             squashed_files = []
 
@@ -576,9 +577,8 @@ class Image(object):
                             continue
 
                         # Special case: hard links to files that were already removed
-                        if member.islnk() and member.linkname in to_skip:
-                            self.log.debug("Found a hard link to a file which is marked to be skipped: %s, skipping hard link too" % member.linkname)
-                            to_skip.append(member.name)
+                        if member.islnk():
+                            skipped_hard_links.append(member)
                             continue
 
                         if member.isfile():
@@ -591,6 +591,20 @@ class Image(object):
 
                         # We added a file to the squashed tar, so let's note it
                         squashed_files.append(member.name)
+
+            # This list shouldn't be that long
+            for member in skipped_hard_links:
+                # We need to check if we should skip adding back the hard link
+                # This can happen in the following situations:
+                # 1. hard link is on the list of files to skip
+                # 2. hard link target is on the list of files to skip
+                # 3. hard link is already in squashed files
+                # 4. hard link target is NOT in already squashed files
+                if member.linkname in to_skip or member.name in to_skip or member.name in squashed_files or member.linkname not in squashed_files:
+                    self.log.debug("Found a hard link %s to a file which is marked to be skipped: %s, skipping hard link too" % (member.name, member.linkname))
+                else:
+                    squashed_tar.addfile(member)
+                    squashed_files.append(member.name)
 
             if layers_to_move:
                 # Find all files in layers that we don't squash

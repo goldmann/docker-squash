@@ -581,12 +581,22 @@ class Image(object):
                             skipped_hard_links.append(member)
                             continue
 
+                        # If we have a symlink to a location that does not exist in the
+                        # squashed tar (yet), we don't know if it's a file or a directory.
+                        # In case it's a directory - we cannot add any new files under
+                        # this directory because extration will fail at the import time.
+                        # Assume here the target is directory (if it's a file it won't
+                        # break) and skip all files that should be added under this directory.
+                        if member.issym() and member.linkname not in squashed_files:
+                            to_skip.append(os.path.join(member.name, "/"))
+                            continue
+
                         if member.isfile():
                             # Finally add the file to archive
                             squashed_tar.addfile(
                                 member, layer_tar.extractfile(member))
                         else:
-                            # Special cases: symlinks and hard links, and other files, we skip the file itself
+                            # Special case: other(?) files, we skip the file itself
                             squashed_tar.addfile(member)
 
                         # We added a file to the squashed tar, so let's note it

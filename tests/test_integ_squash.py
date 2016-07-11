@@ -737,6 +737,21 @@ class TestIntegSquash(IntegSquash):
                 squashed_image.assertFileExists('usr/libexec/git-core/git-remote-ftp')
                 squashed_image.assertFileExists('usr/libexec/git-core/git-remote-http')
 
+    # https://github.com/goldmann/docker-squash/issues/104
+    def test_should_handle_symlinks_to_nonexisting_locations(self):
+        dockerfile = '''
+        FROM %s
+        RUN mkdir -p /var/log
+        RUN touch /var/log/somelog
+        RUN mv /var/log /var/log-removed && ln -sf /data/var/log /var/log
+        RUN rm -rf /var/log-removed
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 3, numeric=True) as squashed_image:
+                self.assertEqual(
+                    len(squashed_image.layers), len(image.layers) - 2)
+
     def test_should_squash_every_layer_from_an_image_from_docker_hub(self):
         dockerfile = '''
         FROM python:3.5.1-alpine

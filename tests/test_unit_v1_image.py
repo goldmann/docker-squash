@@ -274,6 +274,31 @@ class TestAddMarkers(unittest.TestCase):
 
         self.assertTrue(len(tar.addfile.mock_calls) == 0)
 
+    # https://github.com/goldmann/docker-squash/issues/108
+    def test_should_add_marker_file_when_tar_has_prefixed_entries(self):
+        tar = mock.Mock()
+        # Files already in tar
+        tar.getnames.return_value = ['./abc', './def']
+
+        marker_1 = mock.Mock()
+        type(marker_1).name = mock.PropertyMock(return_value='.wh.some/file')
+        marker_2 = mock.Mock()
+        type(marker_2).name = mock.PropertyMock(return_value='.wh.file2')
+
+        markers = {marker_1: 'filecontent1', marker_2: 'filecontent2'}
+
+        # List of layers to move (and files in these layers)
+        self.squash._add_markers(markers, tar, {'1234layerdid': ['./some/file', './other/file', './stuff']})
+
+        self.assertEqual(len(tar.addfile.mock_calls), 1)
+        tar_info, marker_file = tar.addfile.call_args[0]
+        self.assertIsInstance(tar_info, tarfile.TarInfo)
+        # We need to add the marker file because we need to
+        # override the already existing file
+        self.assertEqual(marker_file, 'filecontent1')
+        self.assertTrue(tar_info.isfile())
+
+
 class TestGeneral(unittest.TestCase):
 
     def setUp(self):

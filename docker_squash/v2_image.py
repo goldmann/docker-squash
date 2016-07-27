@@ -280,10 +280,10 @@ class V2Image(Image):
         if self.layer_paths_to_move:
             config['parent'] = self.layer_paths_to_move[-1]
         else:
-            del config['parent']
+            config.pop("parent", None)
         # Update 'id' - it should be the path to the layer
         config['id'] = layer_path_id
-        del config['container']
+        config.pop("container", None)
         return config
 
     def _generate_image_metadata(self):
@@ -294,7 +294,7 @@ class V2Image(Image):
         metadata['created'] = self.date
 
         # Remove unnecessary or old fields
-        del metadata['container']
+        metadata.pop("container", None)
 
         # Remove squashed layers from history
         metadata['history'] = metadata['history'][:len(self.layers_to_move)]

@@ -42,7 +42,9 @@ class CLI(object):
         parser.add_argument(
             '-f', '--from-layer', help='ID of the layer or image ID or image name. If not specified will squash all layers in the image')
         parser.add_argument(
-            '-t', '--tag', help="Specify the tag to be used for the new image. By default it'll be set to 'image' argument")
+            '-t', '--tag', help="Specify the tag to be used for the new image. by default it'll be set to 'image' argument")
+        parser.add_argument(
+            '-c', '--cleanup', action='store_true', help="Remove source image from Docker after squashing")
         parser.add_argument(
             '--tmp-dir', help='Temporary directory to be used')
         parser.add_argument(
@@ -59,7 +61,7 @@ class CLI(object):
 
         try:
             squash.Squash(log=self.log, image=args.image,
-                          from_layer=args.from_layer, tag=args.tag, output_path=args.output_path, tmp_dir=args.tmp_dir, development=args.development).run()
+                          from_layer=args.from_layer, tag=args.tag, output_path=args.output_path, tmp_dir=args.tmp_dir, development=args.development, cleanup=args.cleanup).run()
         except KeyboardInterrupt:
             self.log.error("Program interrupted by user, exiting...")
             sys.exit(1)

@@ -14,7 +14,7 @@ from docker_squash.version import version
 class Squash(object):
 
     def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None,
-                 output_path=None, load_image=True, development=False):
+                 output_path=None, load_image=True, development=False, cleanup=False):
         self.log = log
         self.docker = docker
         self.image = image
@@ -24,6 +24,7 @@ class Squash(object):
         self.output_path = output_path
         self.load_image = load_image
         self.development = development
+        self.cleanup = cleanup
 
         if not docker:
             self.docker = common.docker_client(self.log)
@@ -65,12 +66,22 @@ class Squash(object):
 
             raise
 
+    def _cleanup(self):
+        try:
+            image_id = self.docker.inspect_image(self.image)['Id']
+        except:
+            self.log.warn("Could not get the image ID for %s image, skipping cleanup after squashing" % self.image)
+            return
+
+        self.log.info("Removing old %s image..." % self.image)
+        self.docker.remove_image(image_id, force=False, noprune=False)
+        self.log.info("Image removed!")
+
     def squash(self, image):
         # Do the actual squashing
         new_image_id = image.squash()
 
-        self.log.info(
-            "New squashed image ID is %s" % new_image_id)
+        self.log.info("New squashed image ID is %s" % new_image_id)
 
         if self.output_path:
             # Move the tar archive to the specified path
@@ -80,7 +91,15 @@ class Squash(object):
             # Load squashed image into Docker
             image.load_squashed_image()
 
+        # Clean up all temporary files
         image.cleanup()
+
+        # Remove the source image - this is the only possible way
+        # to remove orphaned layers from Docker daemon at the build time.
+        # We cannot use here a tag name because it could be used as the target,
+        # squashed image tag - we need to use the image ID.
+        if self.cleanup:
+            self._cleanup()
 
         self.log.info("Done")
 

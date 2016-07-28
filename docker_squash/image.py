@@ -636,7 +636,7 @@ class Image(object):
                         squashed_files.append(normalized_name)
 
             # This list shouldn't be that long
-            for member in skipped_hard_links.values() + skipped_sym_links.values():
+            for member in list(skipped_hard_links.values()) + list(skipped_sym_links.values()):
                 normalized_name = self._normalize_path(member.name)
                 normalized_linkname = self._normalize_path(member.linkname)
                 # We need to check if we should skip adding back the hard link

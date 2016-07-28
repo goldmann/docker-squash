@@ -754,7 +754,7 @@ class TestIntegSquash(IntegSquash):
 
     def test_should_squash_every_layer_from_an_image_from_docker_hub(self):
         dockerfile = '''
-        FROM python:3.5.1-alpine
+        FROM python:3.5-alpine
         '''
 
         with self.Image(dockerfile) as image:

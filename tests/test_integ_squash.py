@@ -754,13 +754,30 @@ class TestIntegSquash(IntegSquash):
 
     def test_should_squash_every_layer_from_an_image_from_docker_hub(self):
         dockerfile = '''
-        FROM python:3.5.1-alpine
+        FROM python:3.5-alpine
         '''
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image) as squashed_image:
                 self.assertEqual(
                     len(squashed_image.layers), 1)
+
+    # https://github.com/goldmann/docker-squash/issues/111
+    def test_correct_symlinks_squashing(self):
+        dockerfile = '''
+        FROM %s
+        RUN mkdir -p /zzz
+        RUN ln -s /zzz /xxx
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image) as squashed_image:
+                squashed_image.assertFileExists('zzz')
+                squashed_image.assertFileExists('xxx')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('zzz')
+                    container.assertFileExists('xxx')
 
 
 class NumericValues(IntegSquash):

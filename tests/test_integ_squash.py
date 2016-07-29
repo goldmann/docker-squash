@@ -779,6 +779,64 @@ class TestIntegSquash(IntegSquash):
                     container.assertFileExists('zzz')
                     container.assertFileExists('xxx')
 
+    # https://github.com/goldmann/docker-squash/issues/112
+    def test_should_add_broken_symlinks_back(self):
+        dockerfile = '''
+        FROM %s
+        RUN touch a
+        RUN touch b
+        RUN ln -s /zzz /xxx
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image) as squashed_image:
+                squashed_image.assertFileExists('xxx')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('xxx')
+
+    def test_should_add_hard_hard_link_back_if_target_exists_in_moved_files(self):
+        dockerfile = '''
+        FROM %s
+        RUN touch a
+        RUN touch b
+        RUN ln /a /link
+        RUN touch c
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 3, numeric=True) as squashed_image:
+                squashed_image.assertFileExists('link')
+                squashed_image.assertFileExists('b')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('link')
+                    container.assertFileExists('b')
+                    container.assertFileExists('a')
+                    container.assertFileExists('c')
+
+    # https://github.com/goldmann/docker-squash/issues/112
+    def test_should_add_sym_link_back_if_it_was_broken_before(self):
+        dockerfile = '''
+        FROM %s
+        RUN touch a
+        RUN touch b
+        RUN touch c
+        RUN ln -s /a /link
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 3, numeric=True) as squashed_image:
+                squashed_image.assertFileExists('link')
+                squashed_image.assertFileExists('b')
+                squashed_image.assertFileExists('c')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('link')
+                    container.assertFileExists('a')
+                    container.assertFileExists('b')
+                    container.assertFileExists('c')
+
 
 class NumericValues(IntegSquash):
     @classmethod

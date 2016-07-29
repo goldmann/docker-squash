@@ -251,10 +251,10 @@ class TestAddMarkers(unittest.TestCase):
         # List of marker files to add back
         markers = {marker_1: 'marker_1', marker_2: 'marker_2'}
         # List of files in all layers to be moved
-        files_in_moved_layers = {'1234layerdid': ['some/file', 'marker_2']}
+        files_in_moved_layers = {'1234layerdid': ['/some/file', '/marker_2']}
         self.squash._add_markers(markers, tar, files_in_moved_layers)
 
-        self.assertTrue(len(tar.addfile.mock_calls) == 1)
+        self.assertEqual(len(tar.addfile.mock_calls), 1)
         tar_info, marker_file = tar.addfile.call_args[0]
         self.assertIsInstance(tar_info, tarfile.TarInfo)
         self.assertTrue(marker_file == 'marker_2')
@@ -287,8 +287,8 @@ class TestAddMarkers(unittest.TestCase):
 
         markers = {marker_1: 'filecontent1', marker_2: 'filecontent2'}
 
-        # List of layers to move (and files in these layers)
-        self.squash._add_markers(markers, tar, {'1234layerdid': ['./some/file', './other/file', './stuff']})
+        # List of layers to move (and files in these layers), already normalized
+        self.squash._add_markers(markers, tar, {'1234layerdid': ['/some/file', '/other/file', '/stuff']})
 
         self.assertEqual(len(tar.addfile.mock_calls), 1)
         tar_info, marker_file = tar.addfile.call_args[0]

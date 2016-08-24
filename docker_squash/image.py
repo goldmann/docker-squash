@@ -531,6 +531,63 @@ class Image(object):
     def _normalize_path(self, path):
         return os.path.normpath(os.path.join("/", path))
 
+    def _add_hardlink(self, squashed_tar, squashed_files, to_skip, files_in_layers_to_move, member):
+        normalized_name = self._normalize_path(member.name)
+        normalized_linkname = self._normalize_path(member.linkname)
+
+        # We need to check if we should skip adding back the hard link
+        # This can happen in the following situations:
+        # 1. hard link is on the list of files to skip
+        # 2. hard link target is on the list of files to skip
+        # 3. hard link is already in squashed files
+        # 4. hard link target is NOT in already squashed files
+        if self._file_should_be_skipped(normalized_name, to_skip) or self._file_should_be_skipped(normalized_linkname, to_skip) or normalized_name in squashed_files or normalized_linkname not in squashed_files:
+
+            # Currently this code is not used, because when adding a hard link
+            # to a file which exists in the lower layer Docker *copies* that
+            # file. As a result we do not have a hard link but a regular file
+            # instead. Not sure if this will be solved in newer Docker versions
+            # but let's keep this code for now.
+            if files_in_layers_to_move:
+                for files in six.itervalues(files_in_layers_to_move):
+                    if normalized_linkname in files:
+                        # TODO: check if we need to take into account marker files
+                        #       in other layers
+                        self.log.debug("Found a hard link '%s' to file '%s' existing in moved layers, adding it back" % (
+                            normalized_name, normalized_linkname))
+                        squashed_files.append(normalized_name)
+                        squashed_tar.addfile(member)
+                        continue
+
+            self.log.debug("Found a hard link '%s' to a file which is marked to be skipped: '%s', skipping link too" % (
+                normalized_name, normalized_linkname))
+        else:
+            if self.debug:
+                self.log.debug("Adding hard link '%s' pointing to '%s' back..." % (
+                    normalized_name, normalized_linkname))
+
+            squashed_files.append(normalized_name)
+            squashed_tar.addfile(member)
+
+    def _add_symlink(self, squashed_tar, squashed_files, to_skip, member):
+        # Handling symlinks. This is similar to hard links with one
+        # difference. Sometimes we do want to have broken symlinks
+        # be addedeither case because these can point to locations
+        # that will become avaialble after adding volumes for example.
+        normalized_name = self._normalize_path(member.name)
+        normalized_linkname = self._normalize_path(member.linkname)
+
+        if self._file_should_be_skipped(normalized_name, to_skip) or self._file_should_be_skipped(normalized_linkname, to_skip) or normalized_name in squashed_files:
+            self.log.debug("Found a symbolic link '%s' to a file which is marked to be skipped: '%s', skipping link too" % (
+                normalized_name, normalized_linkname))
+        else:
+            if self.debug:
+                self.log.debug("Adding symbolic link '%s' pointing to '%s' back..." % (
+                    normalized_name, normalized_linkname))
+
+            squashed_files.append(normalized_name)
+            squashed_tar.addfile(member)
+
     def _squash_layers(self, layers_to_squash, layers_to_move):
         self.log.info("Starting squashing...")
 
@@ -580,6 +637,7 @@ class Image(object):
                     for member in members:
                         if member.issym():
                             normalized_name = self._normalize_path(member.name)
+
                             # We don't add it second time, becuase this file will be older
                             # from what we already have in the list
                             if normalized_name not in skipped_sym_links:
@@ -639,61 +697,10 @@ class Image(object):
 
             # This list shouldn't be that long
             for member in six.itervalues(skipped_hard_links):
-                normalized_name = self._normalize_path(member.name)
-                normalized_linkname = self._normalize_path(member.linkname)
+                self._add_hardlink(squashed_tar, squashed_files, to_skip, files_in_layers_to_move, member)
 
-                # We need to check if we should skip adding back the hard link
-                # This can happen in the following situations:
-                # 1. hard link is on the list of files to skip
-                # 2. hard link target is on the list of files to skip
-                # 3. hard link is already in squashed files
-                # 4. hard link target is NOT in already squashed files
-                if self._file_should_be_skipped(normalized_name, to_skip) or self._file_should_be_skipped(normalized_linkname, to_skip) or normalized_name in squashed_files or normalized_linkname not in squashed_files:
-
-                    # Currently this code is not used, because when adding a hard link
-                    # to a file which exists in the lower layer Docker *copies* that
-                    # file. As a result we do not have a hard link but a regular file
-                    # instead. Not sure if this will be solved in newer Docker versions
-                    # but let's keep this code for now.
-                    if files_in_layers_to_move:
-                        for files in six.itervalues(files_in_layers_to_move):
-                            if normalized_linkname in files:
-                                # TODO: check if we need to take into account marker files
-                                #       in other layers
-                                self.log.debug("Found a hard link '%s' to file '%s' existing in moved layers, adding it back" % (
-                                    normalized_name, normalized_linkname))
-                                squashed_files.append(normalized_name)
-                                squashed_tar.addfile(member)
-                                continue
-
-                    self.log.debug("Found a hard link '%s' to a file which is marked to be skipped: '%s', skipping link too" % (
-                        normalized_name, normalized_linkname))
-                else:
-                    if self.debug:
-                        self.log.debug("Adding hard link '%s' pointing to '%s' back..." % (
-                            normalized_name, normalized_linkname))
-
-                    squashed_files.append(normalized_name)
-                    squashed_tar.addfile(member)
-
-            # Handling symlinks. This is similar to hard links with one
-            # difference. Sometimes we do want to have broken symlinks
-            # be addedeither case because these can point to locations
-            # that will become avaialble after adding volumes for example.
             for member in six.itervalues(skipped_sym_links):
-                normalized_name = self._normalize_path(member.name)
-                normalized_linkname = self._normalize_path(member.linkname)
-
-                if self._file_should_be_skipped(normalized_name, to_skip) or self._file_should_be_skipped(normalized_linkname, to_skip) or normalized_name in squashed_files:
-                    self.log.debug("Found a symbolic link '%s' to a file which is marked to be skipped: '%s', skipping link too" % (
-                        normalized_name, normalized_linkname))
-                else:
-                    if self.debug:
-                        self.log.debug("Adding symbolic link '%s' pointing to '%s' back..." % (
-                            normalized_name, normalized_linkname))
-
-                    squashed_files.append(normalized_name)
-                    squashed_tar.addfile(member)
+                self._add_symlink(squashed_tar, squashed_files, to_skip, member)
 
             if files_in_layers_to_move:
                 self._add_markers(skipped_markers, squashed_tar,

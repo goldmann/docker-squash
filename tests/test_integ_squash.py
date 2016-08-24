@@ -837,6 +837,52 @@ class TestIntegSquash(IntegSquash):
                     container.assertFileExists('b')
                     container.assertFileExists('c')
 
+    # https://github.com/goldmann/docker-squash/issues/116
+    def test_should_not_skip_sym_link(self):
+        dockerfile = '''
+        FROM %s
+        RUN mkdir /dir
+        RUN touch /dir/a
+        RUN touch /dir/b
+        RUN mkdir /dir/dir
+        RUN touch /dir/dir/file
+        RUN mv /dir/dir /newdir
+        RUN ln -s /newdir /dir/dir
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('dir')
+                    container.assertFileExists('dir/a')
+                    container.assertFileExists('dir/b')
+                    container.assertFileExists('dir/dir')
+                    container.assertFileExists('newdir/file')
+
+    def test_should_not_skip_hard_link(self):
+        dockerfile = '''
+        FROM %s
+        RUN mkdir /dir
+        RUN touch /dir/a
+        RUN touch /dir/b
+        RUN mkdir /dir/dir
+        RUN touch /dir/dir/file
+        RUN mkdir /newdir
+        RUN mv /dir/dir/file /newdir/file
+        RUN ln /newdir/file /dir/dir/file
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('dir')
+                    container.assertFileExists('dir/a')
+                    container.assertFileExists('dir/b')
+                    container.assertFileExists('dir/dir')
+                    container.assertFileExists('newdir/file')
+
 
 class NumericValues(IntegSquash):
     @classmethod

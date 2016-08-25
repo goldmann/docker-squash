@@ -19,23 +19,28 @@ class TestSkippingFiles(unittest.TestCase):
 
     def test_should_skip_exact_files(self):
         ret = self.squash._file_should_be_skipped(
-            '/opt/webserver/something', ['/opt/eap', '/opt/webserver/something'])
-        self.assertTrue(ret)
+            '/opt/webserver/something', [['/opt/eap', '/opt/webserver/something']])
+        self.assertEqual(ret, 1)
 
     def test_should_not_skip_file_not_in_path_to_skip(self):
         ret = self.squash._file_should_be_skipped(
-            '/opt/webserver/tmp', ['/opt/eap', '/opt/webserver/something'])
-        self.assertFalse(ret)
+            '/opt/webserver/tmp', [['/opt/eap', '/opt/webserver/something']])
+        self.assertEqual(ret, 0)
 
     def test_should_not_skip_the_file_that_name_is_similar_to_skipped_path(self):
         ret = self.squash._file_should_be_skipped(
-            '/opt/webserver/tmp1234', ['/opt/eap', '/opt/webserver/tmp'])
-        self.assertFalse(ret)
+            '/opt/webserver/tmp1234', [['/opt/eap', '/opt/webserver/tmp']])
+        self.assertEqual(ret, 0)
 
     def test_should_skip_files_in_subdirectory(self):
         ret = self.squash._file_should_be_skipped(
-            '/opt/webserver/tmp/abc', ['/opt/eap', '/opt/webserver/tmp'])
-        self.assertTrue(ret)
+            '/opt/webserver/tmp/abc', [['/opt/eap', '/opt/webserver/tmp']])
+        self.assertEqual(ret, 1)
+
+    def test_should_skip_files_in_other_layer(self):
+        ret = self.squash._file_should_be_skipped(
+            '/opt/webserver/tmp/abc', [['a'], ['b'], ['/opt/eap', '/opt/webserver/tmp']])
+        self.assertEqual(ret, 3)
 
 
 class TestParseImageName(unittest.TestCase):

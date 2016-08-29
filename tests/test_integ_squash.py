@@ -860,6 +860,7 @@ class TestIntegSquash(IntegSquash):
                     container.assertFileExists('dir/dir')
                     container.assertFileExists('newdir/file')
 
+    # https://github.com/goldmann/docker-squash/issues/118
     def test_should_not_skip_hard_link(self):
         dockerfile = '''
         FROM %s
@@ -883,6 +884,7 @@ class TestIntegSquash(IntegSquash):
                     container.assertFileExists('dir/dir')
                     container.assertFileExists('newdir/file')
 
+    # https://github.com/goldmann/docker-squash/issues/118
     def test_should_not_add_hard_link_if_exists_in_other_squashed_layer(self):
         dockerfile = '''
         FROM %s
@@ -895,6 +897,26 @@ class TestIntegSquash(IntegSquash):
             with self.SquashedImage(image, 2, numeric=True) as squashed_image:
                 with self.Container(squashed_image) as container:
                     pass
+
+    # https://github.com/goldmann/docker-squash/issues/120
+    def test_should_handle_symlinks_to_directory(self):
+        dockerfile = '''
+        FROM %s
+        RUN mkdir /tmp/dir
+        RUN touch /tmp/dir/file
+        RUN set -e ; cd / ; mkdir /data-template ; tar cf - ./tmp/dir/ | ( cd /data-template && tar xf - ) ; mkdir -p $( dirname /tmp/dir ) ; rm -rf /tmp/dir ; ln -sf /data/tmp/dir /tmp/dir
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 3, numeric=True) as squashed_image:
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('data-template')
+                    container.assertFileExists('data-template/tmp')
+                    container.assertFileExists('data-template/tmp/dir')
+                    container.assertFileExists('data-template/tmp/dir/file')
+                    container.assertFileExists('tmp/dir')
+                    container.assertFileDoesNotExist('tmp/dir/file')
 
 
 class NumericValues(IntegSquash):

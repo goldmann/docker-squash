@@ -883,6 +883,19 @@ class TestIntegSquash(IntegSquash):
                     container.assertFileExists('dir/dir')
                     container.assertFileExists('newdir/file')
 
+    def test_should_not_add_hard_link_if_exists_in_other_squashed_layer(self):
+        dockerfile = '''
+        FROM %s
+        RUN echo "base" > file && ln file link
+        RUN echo "first layer" > file && ln -f file link
+        RUN echo "second layer" > file && ln -f file link
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
+                with self.Container(squashed_image) as container:
+                    pass
+
 
 class NumericValues(IntegSquash):
     @classmethod

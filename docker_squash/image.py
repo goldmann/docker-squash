@@ -538,7 +538,7 @@ class Image(object):
     def _normalize_path(self, path):
         return os.path.normpath(os.path.join("/", path))
 
-    def _add_hardlinks(self, squashed_tar, squashed_files, to_skip, files_in_layers_to_move, skipped_hard_links):
+    def _add_hardlinks(self, squashed_tar, squashed_files, to_skip, skipped_hard_links):
         for layer, hardlinks_in_layer in enumerate(skipped_hard_links):
             # We need to start from 1, that's why we bump it here
             current_layer = layer+1
@@ -559,23 +559,6 @@ class Image(object):
                 # 3. hard link is already in squashed files
                 # 4. hard link target is NOT in already squashed files
                 if layer_skip_name and current_layer > layer_skip_name or layer_skip_linkname and current_layer > layer_skip_linkname or normalized_name in squashed_files or normalized_linkname not in squashed_files:
-
-                    # Currently this code is not used, because when adding a hard link
-                    # to a file which exists in the lower layer Docker *copies* that
-                    # file. As a result we do not have a hard link but a regular file
-                    # instead. Not sure if this will be solved in newer Docker versions
-                    # but let's keep this code for now.
-                    if files_in_layers_to_move:
-                        for files in six.itervalues(files_in_layers_to_move):
-                            if normalized_linkname in files:
-                                # TODO: check if we need to take into account marker files
-                                #       in other layers
-                                self.log.debug("Found a hard link '%s' to file '%s' existing in moved layers, adding it back" % (
-                                    normalized_name, normalized_linkname))
-                                squashed_files.append(normalized_name)
-                                squashed_tar.addfile(member)
-                                continue
-
                     self.log.debug("Found a hard link '%s' to a file which is marked to be skipped: '%s', skipping link too" % (
                         normalized_name, normalized_linkname))
                 else:
@@ -735,7 +718,7 @@ class Image(object):
 
                     skipped_hard_links.append(skipped_hard_link_files)
 
-            self._add_hardlinks(squashed_tar, squashed_files, to_skip, files_in_layers_to_move, skipped_hard_links)
+            self._add_hardlinks(squashed_tar, squashed_files, to_skip, skipped_hard_links)
             self._add_symlinks(squashed_tar, squashed_files, to_skip, skipped_sym_links)
 
             if files_in_layers_to_move:

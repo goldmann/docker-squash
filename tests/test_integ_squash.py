@@ -73,7 +73,7 @@ class IntegSquash(unittest.TestCase):
             f = BytesIO(self.dockerfile.encode('utf-8'))
             for line in self.docker.build(fileobj=f, tag=self.tag, rm=True):
                 try:
-                    print(json.loads(line)["stream"].strip())
+                    print(json.loads(line.decode("utf-8"))["stream"].strip())
                 except:
                     print(line)
 
@@ -909,7 +909,6 @@ class TestIntegSquash(IntegSquash):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 3, numeric=True) as squashed_image:
-
                 with self.Container(squashed_image) as container:
                     container.assertFileExists('data-template')
                     container.assertFileExists('data-template/tmp')
@@ -917,6 +916,33 @@ class TestIntegSquash(IntegSquash):
                     container.assertFileExists('data-template/tmp/dir/file')
                     container.assertFileExists('tmp/dir')
                     container.assertFileDoesNotExist('tmp/dir/file')
+
+    # https://github.com/goldmann/docker-squash/issues/122
+    def test_should_not_add_duplicate_files(self):
+        dockerfile = '''
+        FROM {}
+        RUN mkdir -p /etc/systemd/system/multi-user.target.wants
+        RUN mkdir -p /etc/systemd/system/default.target.wants
+        RUN touch /etc/systemd/system/multi-user.target.wants/remote-fs.target
+        RUN touch /etc/systemd/system/default.target.wants/remote-fs.target
+        # End of preparations, going to squash from here
+        RUN find /etc/systemd/system/* '!' -name '*.wants' | xargs rm -rvf
+        RUN rmdir -v /etc/systemd/system/multi-user.target.wants && mkdir /etc/systemd/system/container-ipa.target.wants && ln -s /etc/systemd/system/container-ipa.target.wants /etc/systemd/system/multi-user.target.wants
+        RUN ln -s /etc/group /etc/systemd/system/default.target
+        RUN ln -s /etc/group /etc/systemd/system/container-ipa.target.wants/ipa-server-configure-first.service
+        RUN echo "/etc/systemd/system" > /etc/volume-data-list
+        RUN set -e ; cd / ; mkdir /data-template ; cat /etc/volume-data-list | while read i ; do echo $i ; if [ -e $i ] ; then tar cf - .$i | ( cd /data-template && tar xf - ) ; fi ; mkdir -p $( dirname $i ) ; if [ "$i" == /var/log/ ] ; then mv /var/log /var/log-removed ; else rm -rf $i ; fi ; ln -sf /data$i $i ; done
+        '''.format(TestIntegSquash.BUSYBOX_IMAGE)
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 6, numeric=True, output_path="tox.tar") as squashed_image:
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('data-template/etc/systemd/system/container-ipa.target.wants')
+                    container.assertFileExists('data-template/etc/systemd/system/default.target.wants')
+                    container.assertFileExists('data-template/etc/systemd/system/default.target')
+                    container.assertFileExists('data-template/etc/systemd/system/multi-user.target.wants')
+                    container.assertFileExists('data-template/etc/systemd/system/container-ipa.target.wants/ipa-server-configure-first.service')
+                    container.assertFileExists('etc/systemd/system')
 
 
 class NumericValues(IntegSquash):

@@ -226,7 +226,7 @@ class TestAddMarkers(unittest.TestCase):
         self.squash = Image(self.log, self.docker_client, self.image, None)
 
     def test_should_not_fail_with_empty_list_of_markers_to_add(self):
-        self.squash._add_markers({}, None, None)
+        self.squash._add_markers({}, None, None, [])
 
     def test_should_add_all_marker_files_to_empty_tar(self):
         tar = mock.Mock()
@@ -236,12 +236,30 @@ class TestAddMarkers(unittest.TestCase):
         type(marker_1).name = mock.PropertyMock(return_value='.wh.marker_1')
 
         markers = {marker_1: 'file'}
-        self.squash._add_markers(markers, tar, {})
+        self.squash._add_markers(markers, tar, {}, [])
 
         self.assertTrue(len(tar.addfile.mock_calls) == 1)
         tar_info, marker_file = tar.addfile.call_args[0]
         self.assertIsInstance(tar_info, tarfile.TarInfo)
         self.assertTrue(marker_file == 'file')
+        self.assertTrue(tar_info.isfile())
+
+    def test_should_add_all_marker_files_to_empty_tar_besides_what_should_be_skipped(self):
+        tar = mock.Mock()
+        tar.getnames.return_value = []
+
+        marker_1 = mock.Mock()
+        type(marker_1).name = mock.PropertyMock(return_value='.wh.marker_1')
+        marker_2 = mock.Mock()
+        type(marker_2).name = mock.PropertyMock(return_value='.wh.marker_2')
+
+        markers = {marker_1: 'file1', marker_2: 'file2'}
+        self.squash._add_markers(markers, tar, {'1234layerdid': ['/marker_1', '/marker_2']}, [['/marker_1']])
+
+        self.assertEqual(len(tar.addfile.mock_calls), 1)
+        tar_info, marker_file = tar.addfile.call_args[0]
+        self.assertIsInstance(tar_info, tarfile.TarInfo)
+        self.assertTrue(marker_file == 'file2')
         self.assertTrue(tar_info.isfile())
 
     def test_should_skip_a_marker_file_if_file_is_in_unsquashed_layers(self):
@@ -257,7 +275,7 @@ class TestAddMarkers(unittest.TestCase):
         markers = {marker_1: 'marker_1', marker_2: 'marker_2'}
         # List of files in all layers to be moved
         files_in_moved_layers = {'1234layerdid': ['/some/file', '/marker_2']}
-        self.squash._add_markers(markers, tar, files_in_moved_layers)
+        self.squash._add_markers(markers, tar, files_in_moved_layers, [])
 
         self.assertEqual(len(tar.addfile.mock_calls), 1)
         tar_info, marker_file = tar.addfile.call_args[0]
@@ -275,7 +293,7 @@ class TestAddMarkers(unittest.TestCase):
         type(marker_2).name = mock.PropertyMock(return_value='.wh.marker_2')
 
         markers = {marker_1: 'file1', marker_2: 'file2'}
-        self.squash._add_markers(markers, tar, {'1234layerdid': ['some/file', 'marker_1', 'marker_2']})
+        self.squash._add_markers(markers, tar, {'1234layerdid': ['some/file', 'marker_1', 'marker_2']}, [])
 
         self.assertTrue(len(tar.addfile.mock_calls) == 0)
 
@@ -293,7 +311,7 @@ class TestAddMarkers(unittest.TestCase):
         markers = {marker_1: 'filecontent1', marker_2: 'filecontent2'}
 
         # List of layers to move (and files in these layers), already normalized
-        self.squash._add_markers(markers, tar, {'1234layerdid': ['/some/file', '/other/file', '/stuff']})
+        self.squash._add_markers(markers, tar, {'1234layerdid': ['/some/file', '/other/file', '/stuff']}, [])
 
         self.assertEqual(len(tar.addfile.mock_calls), 1)
         tar_info, marker_file = tar.addfile.call_args[0]

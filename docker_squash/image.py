@@ -140,8 +140,6 @@ class Image(object):
     def _before_squashing(self):
         self._initialize_directories()
 
-        # Location of the exported tar archive with the image to squash
-        self.old_image_tar = os.path.join(self.old_image_dir, "image.tar")
         # Location of the tar archive with squashed layers
         self.squashed_tar = os.path.join(self.squashed_dir, "layer.tar")
 
@@ -204,15 +202,8 @@ class Image(object):
         self.log.debug("Layers to squash: %s", self.layers_to_squash)
         self.log.debug("Layers to move: %s", self.layers_to_move)
 
-        # Save the image in tar format in the tepmorary directory
-        self._save_image(self.old_image_id, self.old_image_tar)
-
-        # Unpack exported image
-        self._unpack(self.old_image_tar, self.old_image_dir)
-
-        # Remove the tar file early to save some space
-        self.log.debug("Removing exported tar (%s)..." % self.old_image_tar)
-        os.remove(self.old_image_tar)
+        # Fetch the image and unpack it on the fly to the old image directory
+        self._save_image(self.old_image_id, self.old_image_dir)
 
         self.log.info("Squashing image '%s'..." % self.image)
 
@@ -316,26 +307,19 @@ class Image(object):
 
         return to_squash, to_leave
 
-    def _save_image(self, image_id, tar_file):
+    def _save_image(self, image_id, directory):
         """ Saves the image as a tar archive under specified name """
 
         for x in [0, 1, 2]:
-            self.log.info("Saving image %s to %s file..." %
-                          (image_id, tar_file))
+            self.log.info("Saving image %s to %s directory..." %
+                          (image_id, directory))
             self.log.debug("Try #%s..." % (x + 1))
 
             try:
                 image = self.docker.get_image(image_id)
 
-                with open(tar_file, 'wb') as f:
-                    while True:
-                        # Read about 10 MB of the tar archive
-                        data = image.read(1024000)
-
-                        if not data:
-                            break
-
-                        f.write(data)
+                with tarfile.open(fileobj=image, mode='r|') as tar:
+                    tar.extractall(path=directory)
 
                 self.log.info("Image saved!")
                 return True

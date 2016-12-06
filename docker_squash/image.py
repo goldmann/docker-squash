@@ -217,7 +217,8 @@ class Image(object):
         self.log.info("Squashing image '%s'..." % self.image)
 
     def _after_squashing(self):
-        pass
+        self.log.debug("Removing from disk already squashed layers...")
+        shutil.rmtree(self.old_image_dir, ignore_errors=True)
 
     def layer_paths(self):
         """

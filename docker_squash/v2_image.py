@@ -188,15 +188,29 @@ class V2Image(Image):
         diff_ids = []
 
         for path in self.layer_paths_to_move:
-            with open(os.path.join(self.old_image_dir, path, "layer.tar"), 'rb') as f:
-                # Make this more efficient, layers can be big!
-                diff_ids.append(hashlib.sha256(f.read()).hexdigest())
+            sha256 = self._compute_sha256(os.path.join(self.old_image_dir, path, "layer.tar"))
+            diff_ids.append(sha256)
 
         if self.layer_paths_to_squash:
-            with open(os.path.join(self.squashed_dir, "layer.tar"), 'rb') as f:
-                diff_ids.append(hashlib.sha256(f.read()).hexdigest())
+            sha256 = self._compute_sha256(os.path.join(self.squashed_dir, "layer.tar"))
+            diff_ids.append(sha256)
 
         return diff_ids
+
+    def _compute_sha256(self, layer_tar):
+        sha256 = hashlib.sha256()
+
+        with open(layer_tar, 'rb') as f:
+            while True:
+                # Read in 10MB chunks
+                data = f.read(10485760)
+
+                if not data:
+                    break
+
+                sha256.update(data)
+
+        return sha256.hexdigest()
 
     def _generate_squashed_layer_path_id(self):
         """

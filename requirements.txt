@@ -1,2 +1,2 @@
-docker-py>=1.7.2
+docker>=2.1.0
 six

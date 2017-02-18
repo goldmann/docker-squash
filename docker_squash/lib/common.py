@@ -34,7 +34,7 @@ def docker_client(log):
     params = docker.utils.kwargs_from_env()
     params["timeout"] = timeout
     try:
-        client = docker.AutoVersionClient(**params)
+        client = docker.api.client.APIClient(**params)
     except docker.errors.DockerException as e:
         log.error(
             "Could not create Docker client, please make sure that you specified valid parameters in the 'DOCKER_HOST' environment variable.")

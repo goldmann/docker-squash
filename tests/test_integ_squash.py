@@ -42,7 +42,7 @@ class IntegSquash(unittest.TestCase):
 
     # Default base url for the connection
     base_url = os.getenv('DOCKER_CONNECTION', 'unix://var/run/docker.sock')
-    docker = docker.AutoVersionClient(base_url=base_url)
+    docker = docker.api.client.APIClient(base_url=base_url)
 
     log = logging.getLogger()
     handler = logging.StreamHandler()
@@ -529,7 +529,7 @@ class TestIntegSquash(IntegSquash):
             with self.SquashedImage(image, 2, output_path="image.tar"):
                 with tarfile.open("image.tar", mode='r') as tar:
                     squashed_layer_path = ImageHelper.top_layer_path(tar)
-                    
+
                     all_files = tar.getnames()
 
                     self.assertIn("%s/json" % squashed_layer_path, all_files)

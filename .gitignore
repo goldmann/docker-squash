@@ -3,6 +3,7 @@
 *.xml
 *.swp
 *.tox
+.cache
 dist
 *egg-info
 target

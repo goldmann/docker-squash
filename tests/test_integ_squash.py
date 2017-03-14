@@ -1,14 +1,11 @@
 import unittest
-import pytest
 import mock
 import six
 import codecs
-import docker
 import os
 import json
 import logging
 import shutil
-import sys
 import tarfile
 import io
 from io import BytesIO
@@ -16,6 +13,7 @@ import uuid
 
 from docker_squash.squash import Squash
 from docker_squash.errors import SquashError
+from docker_squash.lib import common
 
 if not six.PY3:
     import docker_squash.lib.xtarfile
@@ -40,10 +38,6 @@ class IntegSquash(unittest.TestCase):
 
     BUSYBOX_IMAGE = "busybox:1.24"
 
-    # Default base url for the connection
-    base_url = os.getenv('DOCKER_CONNECTION', 'unix://var/run/docker.sock')
-    docker = docker.AutoVersionClient(base_url=base_url)
-
     log = logging.getLogger()
     handler = logging.StreamHandler()
     formatter = logging.Formatter(
@@ -51,6 +45,8 @@ class IntegSquash(unittest.TestCase):
     handler.setFormatter(formatter)
     log.addHandler(handler)
     log.setLevel(logging.DEBUG)
+
+    docker = common.docker_client(log)
 
     @classmethod
     def build_image(cls, dockerfile):
@@ -529,7 +525,7 @@ class TestIntegSquash(IntegSquash):
             with self.SquashedImage(image, 2, output_path="image.tar"):
                 with tarfile.open("image.tar", mode='r') as tar:
                     squashed_layer_path = ImageHelper.top_layer_path(tar)
-                    
+
                     all_files = tar.getnames()
 
                     self.assertIn("%s/json" % squashed_layer_path, all_files)

@@ -6,6 +6,13 @@ import requests
 
 from docker_squash.errors import Error
 
+# First try to import Docker client using the API
+# available in version 2 of the library and fall
+# back to version 1
+try:
+    from docker.api.client import APIClient as APIClientClass
+except ImportError:
+    from docker.client import Client as APIClientClass
 
 DEFAULT_TIMEOUT_SECONDS = 600
 
@@ -31,10 +38,12 @@ def docker_client(log):
     except KeyError:
         pass
 
-    params = docker.utils.kwargs_from_env()
+    params = {"version": "auto"}
+    params.update(docker.utils.kwargs_from_env())
     params["timeout"] = timeout
+
     try:
-        client = docker.AutoVersionClient(**params)
+        client = APIClientClass(**params)
     except docker.errors.DockerException as e:
         log.error(
             "Could not create Docker client, please make sure that you specified valid parameters in the 'DOCKER_HOST' environment variable.")

@@ -8,6 +8,19 @@ from docker_squash import squash
 from docker_squash.version import version
 
 
+# Source: http://stackoverflow.com/questions/1383254/logging-streamhandler-and-standard-streams
+class SingleLevelFilter(logging.Filter):
+    def __init__(self, passlevel, reject):
+        self.passlevel = passlevel
+        self.reject = reject
+
+    def filter(self, record):
+        if self.reject:
+            return (record.levelno != self.passlevel)
+        else:
+            return (record.levelno == self.passlevel)
+
+
 class MyParser(argparse.ArgumentParser):
 
     def error(self, message):
@@ -19,12 +32,21 @@ class MyParser(argparse.ArgumentParser):
 class CLI(object):
 
     def __init__(self):
+        handler_out = logging.StreamHandler(sys.stdout)
+        handler_err = logging.StreamHandler(sys.stderr)
+
+        handler_out.addFilter(SingleLevelFilter(logging.INFO, False))
+        handler_err.addFilter(SingleLevelFilter(logging.INFO, True))
+
         self.log = logging.getLogger()
-        handler = logging.StreamHandler()
         formatter = logging.Formatter(
             '%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
-        handler.setFormatter(formatter)
-        self.log.addHandler(handler)
+
+        handler_out.setFormatter(formatter)
+        handler_err.setFormatter(formatter)
+
+        self.log.addHandler(handler_out)
+        self.log.addHandler(handler_err)
 
     def run(self):
         parser = MyParser(

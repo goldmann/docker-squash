@@ -343,9 +343,7 @@ class Image(object):
 
     def _read_layers(self, layers, image_id):
         """ Reads the JSON metadata for specified layer / image id """
-
-        for layer in self.docker.history(image_id):
-            layers.append(layer['Id'])
+        layers.extend(self.docker.inspect_image(image_id)['RootFS']['Layers'])
 
     def _parse_image_name(self, image):
         """

@@ -107,7 +107,10 @@ class Image(object):
             return None
 
         try:
-            squash_id = self.docker.inspect_image(layer)['Id']
+            if layer.startswith("sha256:"):
+                 squash_id = layer
+            else:
+                 squash_id = self.docker.inspect_image(layer)['Id']
         except:
             raise SquashError(
                 "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % layer)

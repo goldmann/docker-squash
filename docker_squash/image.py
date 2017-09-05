@@ -158,8 +158,6 @@ class Image(object):
         # Read all layers in the image
         self._read_layers(self.old_image_layers, self.old_image_id)
 
-        self.old_image_layers.reverse()
-
         self.log.info("Old image has %s layers", len(self.old_image_layers))
         self.log.debug("Old layers: %s", self.old_image_layers)
 
@@ -344,8 +342,7 @@ class Image(object):
     def _read_layers(self, layers, image_id):
         """ Reads the JSON metadata for specified layer / image id """
 
-        for layer in self.docker.history(image_id):
-            layers.append(layer['Id'])
+        layers.extend(self.docker.inspect_image(image_id)['RootFS']['Layers'])
 
     def _parse_image_name(self, image):
         """

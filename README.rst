@@ -72,7 +72,7 @@ Usage
                             specified will squash all layers in the image
       -t TAG, --tag TAG     Specify the tag to be used for the new image. By
                             default it'll be set to 'image' argument
-      --tmp-dir TMP_DIR     Temporary directory to be used
+      --tmp-dir TMP_DIR     Temporary directory to be created and used
       --output-path OUTPUT_PATH
                             Path where the image should be stored after squashing.
                             If not provided, image will be loaded into Docker

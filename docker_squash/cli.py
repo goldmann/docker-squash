@@ -68,7 +68,7 @@ class CLI(object):
         parser.add_argument(
             '-c', '--cleanup', action='store_true', help="Remove source image from Docker after squashing")
         parser.add_argument(
-            '--tmp-dir', help='Temporary directory to be used')
+            '--tmp-dir', help='Temporary directory to be created and used')
         parser.add_argument(
             '--output-path', help='Path where the image should be stored after squashing. If not provided, image will be loaded into Docker daemon')
 

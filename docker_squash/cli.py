@@ -64,7 +64,7 @@ class CLI(object):
         parser.add_argument(
             '-f', '--from-layer', help='ID of the layer or image ID or image name. If not specified will squash all layers in the image')
         parser.add_argument(
-            '-t', '--tag', help="Specify the tag to be used for the new image. by default it'll be set to 'image' argument")
+            '-t', '--tag', help="Specify the tag to be used for the new image. If not specified no tag will be applied")
         parser.add_argument(
             '-c', '--cleanup', action='store_true', help="Remove source image from Docker after squashing")
         parser.add_argument(

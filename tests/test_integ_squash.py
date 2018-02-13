@@ -12,7 +12,7 @@ from io import BytesIO
 import uuid
 
 from docker_squash.squash import Squash
-from docker_squash.errors import SquashError
+from docker_squash.errors import SquashError, SquashUnnecessaryError
 from docker_squash.lib import common
 
 if not six.PY3:
@@ -612,11 +612,11 @@ class TestIntegSquash(IntegSquash):
         ''' % TestIntegSquash.BUSYBOX_IMAGE
 
         with self.Image(dockerfile) as image:
-            with self.assertRaises(SquashError) as cm:
+            with self.assertRaises(SquashUnnecessaryError) as cm:
                 with self.SquashedImage(image, 1) as squashed_image:
                     pass
 
-        self.assertEquals(str(cm.exception), '1 layer(s) in this image marked to squash, no squashing is required')
+        self.assertEquals(str(cm.exception), 'Single layer marked to squash, no squashing is required')
 
     # https://github.com/goldmann/docker-scripts/issues/52
     # Test may be misleading, but squashing all layers makes sure we hit
@@ -971,6 +971,11 @@ class NumericValues(IntegSquash):
     def test_should_not_squash_zero_number_of_layers(self):
         with self.assertRaisesRegexp(SquashError, "Number of layers to squash cannot be less or equal 0, provided: 0"):
             with self.SquashedImage(NumericValues.image, 0, numeric=True):
+                pass
+
+    def test_should_not_squash_single_layer(self):
+        with self.assertRaisesRegexp(SquashUnnecessaryError, "Single layer marked to squash, no squashing is required"):
+            with self.SquashedImage(NumericValues.image, 1, numeric=True):
                 pass
 
     def test_should_squash_2_layers(self):

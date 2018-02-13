@@ -4,4 +4,7 @@ class Error(Exception):
 
 
 class SquashError(Error):
-    pass
+    code = 1
+
+class SquashUnnecessaryError(SquashError):
+    code = 2

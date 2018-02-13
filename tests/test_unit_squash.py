@@ -9,7 +9,7 @@ from docker_squash.errors import SquashError
 
 
 class TestSquash(unittest.TestCase):
-    
+
     def setUp(self):
         self.log = mock.Mock()
         self.docker_client = mock.Mock()
@@ -31,7 +31,7 @@ class TestSquash(unittest.TestCase):
     def test_should_not_cleanup_after_squashing(self, v2_image):
         squash = Squash(self.log, 'image', self.docker_client, load_image=True)
         squash.run()
-    
+
         v2_image.cleanup.assert_not_called()
 
     @mock.patch('docker_squash.squash.V2Image')
@@ -39,5 +39,5 @@ class TestSquash(unittest.TestCase):
         self.docker_client.inspect_image.return_value = {'Id': "abcdefgh"}
         squash = Squash(self.log, 'image', self.docker_client, load_image=True, cleanup=True)
         squash.run()
-    
+
         self.docker_client.remove_image.assert_called_with('abcdefgh', force=False, noprune=False)

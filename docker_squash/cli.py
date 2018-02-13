@@ -5,6 +5,7 @@ import logging
 import sys
 
 from docker_squash import squash
+from docker_squash.errors import SquashError
 from docker_squash.version import version
 
 
@@ -97,6 +98,9 @@ class CLI(object):
 
             self.log.error(
                 "Execution failed, consult logs above. If you think this is our fault, please file an issue: https://github.com/goldmann/docker-squash/issues, thanks!")
+
+            if isinstance(e, SquashError):
+                sys.exit(e.code)
 
             sys.exit(1)
 

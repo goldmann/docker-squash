@@ -10,7 +10,7 @@ import six
 import tarfile
 import tempfile
 
-from docker_squash.errors import SquashError
+from docker_squash.errors import SquashError, SquashUnnecessaryError
 
 if not six.PY3:
     import docker_squash.lib.xtarfile
@@ -193,9 +193,11 @@ class Image(object):
 
         self.log.info("Checking if squashing is necessary...")
 
-        if len(self.layers_to_squash) <= 1:
-            raise SquashError("%s layer(s) in this image marked to squash, no squashing is required" % len(
-                self.layers_to_squash))
+        if len(self.layers_to_squash) < 1:
+            raise SquashError("Invalid number of layers to squash: %s" % len(self.layers_to_squash))
+
+        if len(self.layers_to_squash) == 1:
+            raise SquashUnnecessaryError("Single layer marked to squash, no squashing is required")
 
         self.log.info("Attempting to squash last %s layers...",
                       number_of_layers)

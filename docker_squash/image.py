@@ -207,11 +207,36 @@ class Image(object):
         # Fetch the image and unpack it on the fly to the old image directory
         self._save_image(self.old_image_id, self.old_image_dir)
 
+        self.size_before = self._dir_size(self.old_image_dir)
+
         self.log.info("Squashing image '%s'..." % self.image)
 
     def _after_squashing(self):
         self.log.debug("Removing from disk already squashed layers...")
         shutil.rmtree(self.old_image_dir, ignore_errors=True)
+
+        self.size_after = self._dir_size(self.new_image_dir)
+
+        size_before_mb = float(self.size_before)/1024/1024
+        size_after_mb = float(self.size_after)/1024/1024
+
+        self.log.info("Original image size: %.2f MB" % size_before_mb)
+        self.log.info("Squashed image size: %.2f MB" % size_after_mb)
+
+        if (size_after_mb >= size_before_mb):
+            self.log.info("If the squashed image is larger than original it means that there were no meaningful files to squash and it just added metadata. Are you sure you specified correct parameters?")
+        else:
+            self.log.info("Image size decreased by %.2f %%" % float(size_after_mb/size_before_mb*100))
+
+
+    def _dir_size(self, directory):
+        size = 0
+
+        for path, dirs, files in os.walk(directory):
+            for f in files:
+                size += os.path.getsize(os.path.join(path, f))
+
+        return size
 
     def layer_paths(self):
         """

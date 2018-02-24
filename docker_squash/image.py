@@ -226,7 +226,7 @@ class Image(object):
         if (size_after_mb >= size_before_mb):
             self.log.info("If the squashed image is larger than original it means that there were no meaningful files to squash and it just added metadata. Are you sure you specified correct parameters?")
         else:
-            self.log.info("Image size decreased by %.2f %%" % float(size_after_mb/size_before_mb*100))
+            self.log.info("Image size decreased by %.2f %%" % float(((size_before_mb-size_after_mb)/size_before_mb)*100))
 
 
     def _dir_size(self, directory):

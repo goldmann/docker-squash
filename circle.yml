@@ -20,8 +20,6 @@ dependencies:
     - docker info
 
 test:
-  pre:
-    - make hook-gitter
   override:
     - make test-py27:
         parallel: true

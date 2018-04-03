@@ -12,6 +12,12 @@ test-py34: prepare
 test-py35: prepare
 	tox -e py35 -- tests
 
+test-py36: prepare
+	tox -e py36 -- tests
+
+test-py37: prepare
+	tox -e py37 -- tests
+
 test-unit: prepare
 	tox -- tests/test_unit*
 
@@ -27,6 +33,11 @@ else
 	@sudo curl -L -o /usr/bin/docker https://s3-external-1.amazonaws.com/circle-downloads/docker-1.9.1-circleci
 	@sudo chmod +x /usr/bin/docker
 endif
+
+ci-install-pythons:
+	curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
+	pyenv update
+	for pyver in 2.7.14 3.4.8 3.5.5 3.6.5; do pyenv install -s $$pyver; done
 
 ci-publish-junit:
 	@mkdir -p ${CIRCLE_TEST_REPORTS}

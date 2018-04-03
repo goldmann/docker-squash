@@ -1,19 +1,20 @@
-import unittest
-import mock
-import six
 import codecs
-import os
+import io
 import json
 import logging
+import os
 import shutil
 import tarfile
-import io
-from io import BytesIO
+import unittest
 import uuid
+from io import BytesIO
 
-from docker_squash.squash import Squash
+import mock
+import six
+
 from docker_squash.errors import SquashError, SquashUnnecessaryError
 from docker_squash.lib import common
+from docker_squash.squash import Squash
 
 if not six.PY3:
     import docker_squash.lib.xtarfile
@@ -21,7 +22,7 @@ if not six.PY3:
 class ImageHelper(object):
     @staticmethod
     def top_layer_path(tar):
-        #tar_object.seek(0)
+        # tar_object.seek(0)
         reader = codecs.getreader("utf-8")
 
         if 'repositories' in tar.getnames():
@@ -34,8 +35,8 @@ class ImageHelper(object):
             manifest = json.load(reader(tar.extractfile(manifest_member)))
             return manifest[0]["Layers"][-1].split("/")[0]
 
-class IntegSquash(unittest.TestCase):
 
+class IntegSquash(unittest.TestCase):
     BUSYBOX_IMAGE = "busybox:1.24"
 
     log = logging.getLogger()
@@ -100,7 +101,8 @@ class IntegSquash(unittest.TestCase):
 
     class SquashedImage(object):
 
-        def __init__(self, image, number_of_layers=None, output_path=None, load_image=True, numeric=False, tmp_dir=None, log=None, development=False, tag=True):
+        def __init__(self, image, number_of_layers=None, output_path=None, load_image=True, numeric=False, tmp_dir=None,
+                     log=None, development=False, tag=True, rebase=None):
             self.image = image
             self.number_of_layers = number_of_layers
             self.docker = TestIntegSquash.docker
@@ -114,17 +116,15 @@ class IntegSquash(unittest.TestCase):
             self.numeric = numeric
             self.tmp_dir = tmp_dir
             self.development = development
+            self.rebase = rebase
 
         def __enter__(self):
             from_layer = self.number_of_layers
 
-            if self.number_of_layers and not self.numeric:
-                from_layer = self.docker.history(
-                    self.image.tag)[self.number_of_layers]['Id']
-
             squash = Squash(
                 self.log, self.image.tag, self.docker, tag=self.tag, from_layer=from_layer,
-                output_path=self.output_path, load_image=self.load_image, tmp_dir=self.tmp_dir, development=self.development)
+                output_path=self.output_path, load_image=self.load_image, tmp_dir=self.tmp_dir,
+                development=self.development, rebase=self.rebase)
 
             self.image_id = squash.run()
 
@@ -186,7 +186,7 @@ class IntegSquash(unittest.TestCase):
             with tarfile.open(fileobj=self.squashed_layer, mode='r') as tar:
                 member = tar.getmember(name)
                 assert member.islnk(
-                ) == False, "File '%s' should not be a hard link, but it is" % name
+                ) is False, "File '%s' should not be a hard link, but it is" % name
 
     class Container(object):
 
@@ -221,6 +221,7 @@ class IntegSquash(unittest.TestCase):
             with tarfile.open(fileobj=self.content, mode='r') as tar:
                 assert name not in tar.getnames(
                 ), "File %s was found in the container files: %s" % (name, tar.getnames())
+
 
 class TestIntegSquash(IntegSquash):
 
@@ -855,7 +856,6 @@ class TestIntegSquash(IntegSquash):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2, numeric=True) as squashed_image:
-
                 with self.Container(squashed_image) as container:
                     container.assertFileExists('dir')
                     container.assertFileExists('dir/a')
@@ -879,7 +879,6 @@ class TestIntegSquash(IntegSquash):
 
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 2, numeric=True) as squashed_image:
-
                 with self.Container(squashed_image) as container:
                     container.assertFileExists('dir')
                     container.assertFileExists('dir/a')
@@ -944,7 +943,8 @@ class TestIntegSquash(IntegSquash):
                     container.assertFileExists('data-template/etc/systemd/system/default.target.wants')
                     container.assertFileExists('data-template/etc/systemd/system/default.target')
                     container.assertFileExists('data-template/etc/systemd/system/multi-user.target.wants')
-                    container.assertFileExists('data-template/etc/systemd/system/container-ipa.target.wants/ipa-server-configure-first.service')
+                    container.assertFileExists(
+                        'data-template/etc/systemd/system/container-ipa.target.wants/ipa-server-configure-first.service')
                     container.assertFileExists('etc/systemd/system')
 
 
@@ -987,7 +987,6 @@ class NumericValues(IntegSquash):
 
     def test_should_squash_2_layers(self):
         with self.SquashedImage(NumericValues.image, 2, numeric=True) as squashed_image:
-
             i_h = NumericValues.image.history[0]
             s_h = squashed_image.history[0]
 
@@ -1018,6 +1017,42 @@ class NumericValues(IntegSquash):
             self.assertEqual(s_h['CreatedBy'], '')
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 3)
+
+
+class RebaseTests(IntegSquash):
+    def test_rebase(self):
+        dockerfile_base = '''
+        FROM %s
+        RUN touch /layer_that_stays
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile_base) as base_image:
+            dockerfile_dev_base = '''
+            FROM %s
+            RUN touch /somefile_layer1
+            RUN touch /somefile_layer2
+            RUN touch /somefile_layer3
+            ''' % base_image.tag
+
+            with self.Image(dockerfile_dev_base) as dev_base_image:
+                dockerfile_final = '''
+                FROM %s
+                RUN touch /somefile_layer4
+                RUN touch /somefile_layer5
+                ''' % dev_base_image.tag
+
+                with self.Image(dockerfile_final) as final_image:
+                    with self.SquashedImage(final_image, rebase=base_image.tag,
+                                            number_of_layers=dev_base_image.tag) as squashed_image:
+                        with self.Container(squashed_image) as container:
+                            container.assertFileDoesNotExist('somefile_layer1')
+                            container.assertFileDoesNotExist('somefile_layer2')
+                            container.assertFileDoesNotExist('somefile_layer3')
+                            container.assertFileExists('somefile_layer4')
+                            container.assertFileExists('somefile_layer5')
+                            container.assertFileExists('bin/sh')
+                            container.assertFileExists('layer_that_stays')
+
 
 if __name__ == '__main__':
     unittest.main()

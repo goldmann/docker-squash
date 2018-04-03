@@ -33,7 +33,7 @@ class V1Image(Image):
         self._write_version_file(self.squashed_dir)
         # Move all the layers that should be untouched
         self._move_layers(self.layers_to_move,
-                          self.old_image_dir, self.new_image_dir)
+                          self.old_image_dir if not self.rebase else self.rebase_image_dir, self.new_image_dir)
 
         config_file = os.path.join(
             self.old_image_dir, self.old_image_id, "json")

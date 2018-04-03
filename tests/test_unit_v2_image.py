@@ -43,13 +43,14 @@ class TestGeneratingMetadata(unittest.TestCase):
         self.image = "whatever"
         self.image = V2Image(self.log, self.docker_client, self.image, None)
 
-    def test_generate_manifest(self):
+    def test_generate_manifest_no_rebase(self):
         old_image_manifest = {'Layers': [
             "layer_a/layer.tar", "layer_b/layer.tar", "layer_c/layer.tar"]}
         layer_paths_to_move = ["layer_a", "layer_b"]
 
         metadata = self.image._generate_manifest_metadata(
-            "this_is_image_id", "image", "squashed", old_image_manifest, layer_paths_to_move, "this_is_layer_path_id")
+            "this_is_image_id", "image", "squashed", old_image_manifest, layer_paths_to_move,
+            "this_is_layer_path_id")
 
         self.assertEqual(len(metadata), 1)
 
@@ -61,6 +62,27 @@ class TestGeneratingMetadata(unittest.TestCase):
         self.assertEqual(metadata['Layers'], [
                          "layer_a/layer.tar", "layer_b/layer.tar", "this_is_layer_path_id/layer.tar"])
 
+    def test_generate_manifest_rebase(self):
+        old_image_manifest = {'Layers': [
+            "layer_a/layer.tar", "layer_b/layer.tar", "layer_c/layer.tar"]}
+        rebase_image_manifest = {'Layers': [
+            "layer_x/layer.tar", "layer_y/layer.tar", "layer_z/layer.tar"]}
+        layer_paths_to_move = ["layer_x", "layer_y", "layer_z"]
+
+        metadata = self.image._generate_manifest_metadata(
+            "this_is_image_id", "image", "squashed", old_image_manifest, layer_paths_to_move,
+            "this_is_layer_path_id", rebase_image_manifest=rebase_image_manifest)
+
+        self.assertEqual(len(metadata), 1)
+
+        metadata = metadata[0]
+
+        self.assertEqual(type(metadata), OrderedDict)
+        self.assertEqual(metadata['Config'], 'this_is_image_id.json')
+        self.assertEqual(metadata['RepoTags'], ['image:squashed'])
+        self.assertEqual(metadata['Layers'], ["layer_x/layer.tar", "layer_y/layer.tar", "layer_z/layer.tar",
+                                              "this_is_layer_path_id/layer.tar"])
+
     def test_generate_image_metadata_without_any_layers_to_squash(self):
         self.image.old_image_dir = "/tmp/old"
         self.image.squash_id = "squash_id"
@@ -71,6 +93,7 @@ class TestGeneratingMetadata(unittest.TestCase):
         # We want to move 2 layers with content
         self.image.layer_paths_to_move = ["layer_path_1", "layer_path_2"]
         self.image.layer_paths_to_squash = []
+        self.image.old_image_squash_marker = 3
         # Image that contains:
         # - 4 layers
         # - 3 layers that have content
@@ -97,6 +120,7 @@ class TestGeneratingMetadata(unittest.TestCase):
         # We want to move 2 layers with content
         self.image.layer_paths_to_move = ["layer_path_1", "layer_path_2"]
         self.image.layer_paths_to_squash = ["layer_path_3", "layer_path_4"]
+        self.image.old_image_squash_marker = 3
         # Image that contains:
         # - 4 layers
         # - 3 layers that have content

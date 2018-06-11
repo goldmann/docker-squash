@@ -21,11 +21,7 @@ dependencies:
 
 test:
   override:
-    - make test-py27:
-        parallel: true
-    - make test-py34:
-        parallel: true
-    - make test-py35:
+    - case $CIRCLE_NODE_INDEX in 0) make test-py27 ;; 1) make test-py34 ;; 2) make test-py35 ;; esac:
         parallel: true
   post:
     - make ci-publish-junit

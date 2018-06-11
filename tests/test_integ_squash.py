@@ -91,8 +91,9 @@ class IntegSquash(unittest.TestCase):
         def _save_image(self):
             image = self.docker.get_image(self.tag)
 
-            buf = io.BytesIO()
-            buf.write(image.data)
+            buf = BytesIO()
+            for chunk in image:
+                buf.write(chunk)
             buf.seek(0)  # Rewind
 
             return buf
@@ -149,8 +150,9 @@ class IntegSquash(unittest.TestCase):
         def _save_image(self):
             image = self.docker.get_image(self.tag)
 
-            buf = io.BytesIO()
-            buf.write(image.data)
+            buf = BytesIO()
+            for chunk in image:
+                buf.write(chunk)
             buf.seek(0)  # Rewind
 
             return buf
@@ -196,7 +198,12 @@ class IntegSquash(unittest.TestCase):
         def __enter__(self):
             self.container = self.docker.create_container(image=self.image.tag)
             data = self.docker.export(self.container)
-            self.content = six.BytesIO(data.read())
+
+            self.content = BytesIO()
+            for chunk in data:
+                self.content.write(chunk)
+            self.content.seek(0)  # Rewind
+
             return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):

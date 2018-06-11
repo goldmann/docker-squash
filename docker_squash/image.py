@@ -1,5 +1,6 @@
 
 import datetime
+import docker
 import hashlib
 import json
 import logging
@@ -9,6 +10,7 @@ import shutil
 import six
 import tarfile
 import tempfile
+import threading
 
 from docker_squash.errors import SquashError, SquashUnnecessaryError
 
@@ -334,6 +336,10 @@ class Image(object):
 
         return to_squash, to_leave
 
+    def _extract_tar(self, fileobj, directory):
+        with tarfile.open(fileobj=fileobj, mode='r|') as tar:
+            tar.extractall(path=directory)
+
     def _save_image(self, image_id, directory):
         """ Saves the image as a tar archive under specified name """
 
@@ -345,9 +351,31 @@ class Image(object):
             try:
                 image = self.docker.get_image(image_id)
 
-                with tarfile.open(fileobj=image, mode='r|') as tar:
-                    tar.extractall(path=directory)
+                if docker.version_info[0] < 3:
+                    # Docker library prior to 3.0.0 returned the requests
+                    # object directly which cold be used to read from
+                    self.log.debug("Extracting image using HTTPResponse object directly")
+                    self._extract_tar(image, directory)
+                else:
+                    # Docker library >=3.0.0 returns iterator over raw data
+                    self.log.debug("Extracting image using iterator over raw data")
 
+                    fd_r, fd_w = os.pipe()
+
+                    r = os.fdopen(fd_r, 'rb')
+                    w = os.fdopen(fd_w, 'wb')
+
+                    extracter = threading.Thread(target=self._extract_tar, args=(r,directory))
+                    extracter.start()
+
+                    for chunk in image:
+                        w.write(chunk)
+
+                    w.flush()
+                    w.close()
+
+                    extracter.join()
+                    r.close()
                 self.log.info("Image saved!")
                 return True
             except Exception as e:

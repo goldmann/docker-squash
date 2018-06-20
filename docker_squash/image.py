@@ -44,16 +44,18 @@ class Image(object):
     FORMAT = None
     """ Image format version """
 
-    def __init__(self, log, docker, image, from_layer, tmp_dir=None, tag=None):
+    def __init__(self, log, docker, image, from_layer, tmp_dir=None, tag=None, rebase=None):
         self.log = log
         self.debug = self.log.isEnabledFor(logging.DEBUG)
         self.docker = docker
         self.image = image
         self.from_layer = from_layer
         self.tag = tag
+        self.rebase = rebase
         self.image_name = None
         self.image_tag = None
         self.squash_id = None
+
 
         # Workaround for https://play.golang.org/p/sCsWMXYxqy
         #
@@ -71,6 +73,7 @@ class Image(object):
 
     def squash(self):
         self._before_squashing()
+        self.log.info("Squashing image '%s'..." % self.image)
         ret = self._squash()
         self._after_squashing()
 
@@ -94,12 +97,14 @@ class Image(object):
 
         # Temporary location on the disk of the old, unpacked *image*
         self.old_image_dir = os.path.join(self.tmp_dir, "old")
+        # Temporary location on the disk of the rebase, unpacked *image*
+        self.rebase_image_dir = os.path.join(self.tmp_dir, "rebase")
         # Temporary location on the disk of the new, unpacked, squashed *image*
         self.new_image_dir = os.path.join(self.tmp_dir, "new")
         # Temporary location on the disk of the squashed *layer*
         self.squashed_dir = os.path.join(self.new_image_dir, "squashed")
 
-        for d in self.old_image_dir, self.new_image_dir:
+        for d in self.old_image_dir, self.new_image_dir, self.rebase_image_dir:
             os.makedirs(d)
 
     def _squash_id(self, layer):
@@ -152,8 +157,16 @@ class Image(object):
         try:
             self.old_image_id = self.docker.inspect_image(self.image)['Id']
         except SquashError:
-            raise SquashError(
-                "Could not get the image ID to squash, please check provided 'image' argument: %s" % self.image)
+            raise SquashError("Could not get the image ID to squash, "
+                              "please check provided 'image' argument: %s" % self.image)
+
+        if self.rebase:
+            # The image id or name of the image to rebase to
+            try:
+                self.rebase = self.docker.inspect_image(self.rebase)['Id']
+            except SquashError:
+                raise SquashError("Could not get the image ID to rebase to, "
+                                  "please check provided 'rebase' argument: %s" % self.rebase)
 
         self.old_image_layers = []
 
@@ -166,32 +179,36 @@ class Image(object):
         self.log.debug("Old layers: %s", self.old_image_layers)
 
         # By default - squash all layers.
-        if self.from_layer == None:
+        if self.from_layer is None:
             self.from_layer = len(self.old_image_layers)
 
         try:
             number_of_layers = int(self.from_layer)
 
-            self.log.debug(
-                "We detected number of layers as the argument to squash")
+            self.log.debug("We detected number of layers as the argument to squash")
         except ValueError:
             self.log.debug("We detected layer as the argument to squash")
 
             squash_id = self._squash_id(self.from_layer)
 
             if not squash_id:
-                raise SquashError(
-                    "The %s layer could not be found in the %s image" % (self.from_layer, self.image))
+                raise SquashError("The %s layer could not be found in the %s image" % (self.from_layer, self.image))
 
-            number_of_layers = len(self.old_image_layers) - \
-                self.old_image_layers.index(squash_id) - 1
+            number_of_layers = len(self.old_image_layers) - self.old_image_layers.index(squash_id) - 1
 
         self._validate_number_of_layers(number_of_layers)
 
         marker = len(self.old_image_layers) - number_of_layers
 
         self.layers_to_squash = self.old_image_layers[marker:]
-        self.layers_to_move = self.old_image_layers[:marker]
+        if self.rebase:
+            self.layers_to_move = []
+            self._read_layers(self.layers_to_move, self.rebase)
+            self.layers_to_move.reverse()
+        else:
+            self.layers_to_move = self.old_image_layers[:marker]
+
+        self.old_image_squash_marker = marker
 
         self.log.info("Checking if squashing is necessary...")
 
@@ -201,17 +218,17 @@ class Image(object):
         if len(self.layers_to_squash) == 1:
             raise SquashUnnecessaryError("Single layer marked to squash, no squashing is required")
 
-        self.log.info("Attempting to squash last %s layers...",
-                      number_of_layers)
+        self.log.info("Attempting to squash last %s layers%s...", number_of_layers,
+                      " rebasing on %s" % self.rebase if self.rebase else "")
         self.log.debug("Layers to squash: %s", self.layers_to_squash)
         self.log.debug("Layers to move: %s", self.layers_to_move)
 
         # Fetch the image and unpack it on the fly to the old image directory
         self._save_image(self.old_image_id, self.old_image_dir)
+        if self.rebase:
+            self._save_image(self.rebase, self.rebase_image_dir)
 
         self.size_before = self._dir_size(self.old_image_dir)
-
-        self.log.info("Squashing image '%s'..." % self.image)
 
     def _after_squashing(self):
         self.log.debug("Removing from disk already squashed layers...")
@@ -698,7 +715,7 @@ class Image(object):
 
         # Find all files in layers that we don't squash
         files_in_layers_to_move = self._files_in_layers(
-            layers_to_move, self.old_image_dir)
+            layers_to_move, self.old_image_dir if not self.rebase else self.rebase_image_dir)
 
         with tarfile.open(self.squashed_tar, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
             to_skip = []

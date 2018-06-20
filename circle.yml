@@ -12,9 +12,14 @@ machine:
     CI: true
 
 dependencies:
+  pre:
+    - mkdir -p ~/.pyenv
+    - make -f Makefile ci-install-pythons
+  cache_directories:
+    - ~/.pyenv
   override:
     - pip install tox tox-pyenv docker-py>=1.7.2 six
-    - pyenv local 2.7.11 3.4.4 3.5.1
+    - pyenv local 2.7.14 3.4.8 3.5.5 3.6.5
   post:
     - docker version
     - docker info
@@ -22,6 +27,10 @@ dependencies:
 test:
   override:
     - case $CIRCLE_NODE_INDEX in 0) make test-py27 ;; 1) make test-py34 ;; 2) make test-py35 ;; esac:
+        parallel: true
+    - make test-py36:
+        parallel: true
+    - make test-py36:
         parallel: true
   post:
     - make ci-publish-junit

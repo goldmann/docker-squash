@@ -19,7 +19,7 @@ class TestSquash(unittest.TestCase):
         squash = Squash(self.log, None, self.docker_client)
         with self.assertRaises(SquashError) as cm:
             squash.run()
-        self.assertEquals(
+        self.assertEqual(
             str(cm.exception), "Image is not provided")
 
     def test_exit_if_no_output_path_provided_and_loading_is_disabled_too(self):

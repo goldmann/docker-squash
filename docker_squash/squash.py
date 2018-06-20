@@ -14,7 +14,7 @@ from docker_squash.version import version
 class Squash(object):
 
     def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None,
-                 output_path=None, load_image=True, development=False, cleanup=False):
+                 output_path=None, load_image=True, development=False, cleanup=False, rebase=None):
         self.log = log
         self.docker = docker
         self.image = image
@@ -25,6 +25,7 @@ class Squash(object):
         self.load_image = load_image
         self.development = development
         self.cleanup = cleanup
+        self.rebase = rebase
 
         if not docker:
             self.docker = common.docker_client(self.log)
@@ -48,10 +49,10 @@ class Squash(object):
 
         if StrictVersion(docker_version['ApiVersion']) >= StrictVersion("1.22"):
             image = V2Image(self.log, self.docker, self.image,
-                            self.from_layer, self.tmp_dir, self.tag)
+                            self.from_layer, self.tmp_dir, self.tag, self.rebase)
         else:
             image = V1Image(self.log, self.docker, self.image,
-                            self.from_layer, self.tmp_dir, self.tag)
+                            self.from_layer, self.tmp_dir, self.tag, self.rebase)
 
         self.log.info("Using %s image format" % image.FORMAT)
 

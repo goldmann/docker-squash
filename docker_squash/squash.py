@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import uuid
 
 from distutils.version import StrictVersion
 
@@ -20,6 +21,7 @@ class Squash(object):
         self.image = image
         self.from_layer = from_layer
         self.tag = tag
+        self.tmp_tag = "docker-squash-%s" % uuid.uuid4().hex[:8]
         self.tmp_dir = tmp_dir
         self.output_path = output_path
         self.load_image = load_image
@@ -48,10 +50,10 @@ class Squash(object):
 
         if StrictVersion(docker_version['ApiVersion']) >= StrictVersion("1.22"):
             image = V2Image(self.log, self.docker, self.image,
-                            self.from_layer, self.tmp_dir, self.tag)
+                            self.from_layer, self.tmp_dir, self.tmp_tag)
         else:
             image = V1Image(self.log, self.docker, self.image,
-                            self.from_layer, self.tmp_dir, self.tag)
+                            self.from_layer, self.tmp_dir, self.tmp_tag)
 
         self.log.info("Using %s image format" % image.FORMAT)
 
@@ -66,16 +68,31 @@ class Squash(object):
 
             raise
 
-    def _cleanup(self):
+    def _remove_image(self, image_name, remove_by_id=True):
         try:
-            image_id = self.docker.inspect_image(self.image)['Id']
+            image = self.docker.inspect_image(image_name)['Id'] if remove_by_id else image_name
         except:
             self.log.warn("Could not get the image ID for %s image, skipping cleanup after squashing" % self.image)
             return
 
-        self.log.info("Removing old %s image..." % self.image)
-        self.docker.remove_image(image_id, force=False, noprune=False)
+        self.log.info("Removing old %s image..." % image_name)
+        self.docker.remove_image(image, force=False, noprune=False)
         self.log.info("Image removed!")
+
+    def _cleanup(self):
+        self._remove_image(self.image)
+        # https://github.com/goldmann/docker-squash/issues/172
+        # Use temporary image and create the desired name base on it
+        # so we will not delete the requested image when source==target image
+        self._switch_tmp_image_to_target_tag()
+
+    def _switch_tmp_image_to_target_tag(self):
+        if self.tag:
+            image,tag = self.tag.split(":", 2) if ":" in self.tag else (self.tag, None)
+            # tag the client requested tag same as the new squashed image name by tmp_lable
+            self.docker.tag(self.tmp_tag, image, tag=tag, force=True)
+            # remove by name since both have the same SHAID
+            self._remove_image(self.tmp_tag, remove_by_id=False)
 
     def squash(self, image):
         # Do the actual squashing

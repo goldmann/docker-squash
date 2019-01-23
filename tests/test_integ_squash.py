@@ -59,11 +59,11 @@ class IntegSquash(unittest.TestCase):
 
     class Image(object):
 
-        def __init__(self, dockerfile):
+        def __init__(self, dockerfile, tag="latest"):
             self.dockerfile = dockerfile
             self.docker = TestIntegSquash.docker
             self.name = "integ-%s" % uuid.uuid1()
-            self.tag = "%s:latest" % self.name
+            self.tag = "%s:%s" % (self.name, tag)
 
         def __enter__(self):
             f = BytesIO(self.dockerfile.encode('utf-8'))
@@ -81,11 +81,12 @@ class IntegSquash(unittest.TestCase):
             with tarfile.open(fileobj=self.tar, mode='r') as tar:
                 self.tarnames = tar.getnames()
 
+            self.image = self.docker.inspect_image(self.tag)
             return self
 
         def __exit__(self, exc_type, exc_val, exc_tb):
             if not os.getenv('CI'):
-                self.docker.remove_image(image=self.tag, force=True)
+                self.docker.remove_image(image=self.image, force=True)
 
         # Duplicated, I know...
         def _save_image(self):
@@ -122,11 +123,12 @@ class IntegSquash(unittest.TestCase):
                 from_layer = self.docker.history(
                     self.image.tag)[self.number_of_layers]['Id']
 
-            squash = Squash(
+            self.squash = Squash(
                 self.log, self.image.tag, self.docker, tag=self.tag, from_layer=from_layer,
                 output_path=self.output_path, load_image=self.load_image, tmp_dir=self.tmp_dir, development=self.development)
+            self.tmp_tag = self.squash.tmp_tag
 
-            self.image_id = squash.run()
+            self.image_id = self.squash.run()
 
             if not self.output_path:
                 self.history = self.docker.history(self.image_id)
@@ -148,7 +150,7 @@ class IntegSquash(unittest.TestCase):
                 self.docker.remove_image(image=self.image_id, force=True)
 
         def _save_image(self):
-            image = self.docker.get_image(self.tag)
+            image = self.docker.get_image(self.tmp_tag)
 
             buf = BytesIO()
             for chunk in image:
@@ -188,6 +190,11 @@ class IntegSquash(unittest.TestCase):
                 assert member.islnk(
                 ) == False, "File '%s' should not be a hard link, but it is" % name
 
+        def assert_target_tag_exists(self):
+            if self.tag:
+                self.squash._switch_tmp_image_to_target_tag()
+                self.docker.inspect_image(self.tag)#raise exception if not exists
+
     class Container(object):
 
         def __init__(self, image):
@@ -196,7 +203,7 @@ class IntegSquash(unittest.TestCase):
             self.log = TestIntegSquash.log
 
         def __enter__(self):
-            self.container = self.docker.create_container(image=self.image.tag)
+            self.container = self.docker.create_container(image=self.image.tmp_tag)
             data = self.docker.export(self.container)
 
             self.content = BytesIO()
@@ -252,6 +259,19 @@ class TestIntegSquash(IntegSquash):
                     # We should have two layers less in the image
                     self.assertTrue(
                         len(squashed_image.layers) == len(image.layers) - 2)
+
+                squashed_image.assert_target_tag_exists()
+
+    def test_same_source_and_target_image_tag_should_not_be_deleted(self):
+        dockerfile = '''
+        FROM %s
+        RUN touch /somefile_layer1
+        RUN touch /somefile_layer2
+        ''' % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile, "squashed") as image:
+            with self.SquashedImage(image, 2) as squashed_image:
+                squashed_image.assert_target_tag_exists()
 
     def test_only_files_from_squashed_image_should_be_in_squashed_layer(self):
         """

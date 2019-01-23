@@ -1,15 +1,11 @@
 import unittest
 import mock
-import six
-import logging
 
-from docker_squash.squash import Squash
-from docker_squash.image import Image
 from docker_squash.errors import SquashError
+from docker_squash.squash import Squash
 
 
 class TestSquash(unittest.TestCase):
-
     def setUp(self):
         self.log = mock.Mock()
         self.docker_client = mock.Mock()
@@ -25,7 +21,8 @@ class TestSquash(unittest.TestCase):
     def test_exit_if_no_output_path_provided_and_loading_is_disabled_too(self):
         squash = Squash(self.log, 'image', self.docker_client, load_image=False, output_path=None)
         squash.run()
-        self.log.warn.assert_called_with("No output path specified and loading into Docker is not selected either; squashed image would not accessible, proceeding with squashing doesn't make sense")
+        self.log.warn.assert_called_with(
+            "No output path specified and loading into Docker is not selected either; squashed image would not accessible, proceeding with squashing doesn't make sense")
 
     @mock.patch('docker_squash.squash.V2Image')
     def test_should_not_cleanup_after_squashing(self, v2_image):
@@ -36,8 +33,11 @@ class TestSquash(unittest.TestCase):
 
     @mock.patch('docker_squash.squash.V2Image')
     def test_should_cleanup_after_squashing(self, v2_image):
-        self.docker_client.inspect_image.return_value = {'Id': "abcdefgh"}
-        squash = Squash(self.log, 'image', self.docker_client, load_image=True, cleanup=True)
+        squash = Squash(self.log, 'image', self.docker_client, tag="new_image", load_image=True, cleanup=True)
+        self.docker_client.inspect_image.return_value = {'Id': "some_id"}
         squash.run()
 
-        self.docker_client.remove_image.assert_called_with('abcdefgh', force=False, noprune=False)
+        calls = [mock.call(image, force=False, noprune=False) for image in ["some_id", squash.tmp_tag]]
+
+        self.docker_client.remove_image.assert_has_calls(calls)
+        self.docker_client.tag.assert_called_once_with(squash.tmp_tag, "new_image", tag=None, force=True)

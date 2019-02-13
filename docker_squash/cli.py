@@ -67,6 +67,8 @@ class CLI(object):
         parser.add_argument(
             '-t', '--tag', help="Specify the tag to be used for the new image. If not specified no tag will be applied")
         parser.add_argument(
+            '-m', '--message', help="Specify a commit message (comment) for the new image.")
+        parser.add_argument(
             '-c', '--cleanup', action='store_true', help="Remove source image from Docker after squashing")
         parser.add_argument(
             '--tmp-dir', help='Temporary directory to be created and used')
@@ -84,7 +86,7 @@ class CLI(object):
 
         try:
             squash.Squash(log=self.log, image=args.image,
-                          from_layer=args.from_layer, tag=args.tag, output_path=args.output_path, tmp_dir=args.tmp_dir, development=args.development, cleanup=args.cleanup).run()
+                          from_layer=args.from_layer, tag=args.tag, comment=args.message, output_path=args.output_path, tmp_dir=args.tmp_dir, development=args.development, cleanup=args.cleanup).run()
         except KeyboardInterrupt:
             self.log.error("Program interrupted by user, exiting...")
             sys.exit(1)

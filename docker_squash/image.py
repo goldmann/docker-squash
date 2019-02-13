@@ -44,13 +44,14 @@ class Image(object):
     FORMAT = None
     """ Image format version """
 
-    def __init__(self, log, docker, image, from_layer, tmp_dir=None, tag=None):
+    def __init__(self, log, docker, image, from_layer, tmp_dir=None, tag=None, comment=""):
         self.log = log
         self.debug = self.log.isEnabledFor(logging.DEBUG)
         self.docker = docker
         self.image = image
         self.from_layer = from_layer
         self.tag = tag
+        self.comment = comment
         self.image_name = None
         self.image_tag = None
         self.squash_id = None

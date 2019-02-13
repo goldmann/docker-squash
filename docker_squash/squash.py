@@ -13,13 +13,14 @@ from docker_squash.version import version
 
 class Squash(object):
 
-    def __init__(self, log, image, docker=None, from_layer=None, tag=None, tmp_dir=None,
+    def __init__(self, log, image, docker=None, from_layer=None, tag=None, comment="", tmp_dir=None,
                  output_path=None, load_image=True, development=False, cleanup=False):
         self.log = log
         self.docker = docker
         self.image = image
         self.from_layer = from_layer
         self.tag = tag
+        self.comment = comment
         self.tmp_dir = tmp_dir
         self.output_path = output_path
         self.load_image = load_image
@@ -48,7 +49,7 @@ class Squash(object):
 
         if StrictVersion(docker_version['ApiVersion']) >= StrictVersion("1.22"):
             image = V2Image(self.log, self.docker, self.image,
-                            self.from_layer, self.tmp_dir, self.tag)
+                            self.from_layer, self.tmp_dir, self.tag, self.comment)
         else:
             image = V1Image(self.log, self.docker, self.image,
                             self.from_layer, self.tmp_dir, self.tag)

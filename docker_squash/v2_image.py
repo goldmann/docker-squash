@@ -316,7 +316,7 @@ class V2Image(Image):
         metadata['rootfs']['diff_ids'] = metadata['rootfs'][
             'diff_ids'][:len(self.layer_paths_to_move)]
 
-        history = {'comment': '', 'created': self.date}
+        history = {'comment': self.comment, 'created': self.date}
 
         if self.layer_paths_to_squash:
             # Add diff_ids for the squashed layer

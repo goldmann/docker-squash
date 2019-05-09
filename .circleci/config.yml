@@ -1,0 +1,40 @@
+version: 2
+jobs:
+  test:
+    parallelism: 4
+    machine:
+      image: circleci/classic:201808-01
+    steps:
+      - checkout
+      - run: docker version
+      - run: docker info
+      - run: pip install tox --user
+      - run: echo 'export PATH=~/.local/bin:$PATH' >> $BASH_ENV
+      - run: pyenv local 2.7.12 3.5.2 3.6.5 3.7.0
+      - run: |
+          if [[ "${CIRCLE_NODE_INDEX}" == 0 ]]; then
+             make test-py27
+          fi
+      - run: |
+          if [[ "${CIRCLE_NODE_INDEX}" == 1 ]]; then
+             make test-py35
+          fi
+      - run: |
+          if [[ "${CIRCLE_NODE_INDEX}" == 2 ]]; then
+             make test-py36
+          fi
+      - run: |
+          if [[ "${CIRCLE_NODE_INDEX}" == 3 ]]; then
+             make test-py37
+          fi
+      - store_test_results:
+          path: target
+
+      - store_artifacts:
+          path: target
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - test

@@ -6,27 +6,20 @@ test: prepare
 test-py27: prepare
 	tox -e py27 -- tests
 
-test-py34: prepare
-	tox -e py34 -- tests
-
 test-py35: prepare
 	tox -e py35 -- tests
+
+test-py36: prepare
+	tox -e py36 -- tests
+
+test-py37: prepare
+	tox -e py37 -- tests
 
 test-unit: prepare
 	tox -- tests/test_unit*
 
 test-integ: prepare
 	tox -- tests/test_integ*
-
-ci-install-docker:
-ifeq ($(CIRCLE_NODE_INDEX),0)
-	@echo "Installing Docker 1.10"
-	@curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
-else
-	@echo "Installing Docker 1.9.1"
-	@sudo curl -L -o /usr/bin/docker https://s3-external-1.amazonaws.com/circle-downloads/docker-1.9.1-circleci
-	@sudo chmod +x /usr/bin/docker
-endif
 
 ci-publish-junit:
 	@mkdir -p ${CIRCLE_TEST_REPORTS}

@@ -196,10 +196,12 @@ class Image(object):
         self.log.info("Checking if squashing is necessary...")
 
         if len(self.layers_to_squash) < 1:
-            raise SquashError("Invalid number of layers to squash: %s" % len(self.layers_to_squash))
+            raise SquashError(
+                "Invalid number of layers to squash: %s" % len(self.layers_to_squash))
 
         if len(self.layers_to_squash) == 1:
-            raise SquashUnnecessaryError("Single layer marked to squash, no squashing is required")
+            raise SquashUnnecessaryError(
+                "Single layer marked to squash, no squashing is required")
 
         self.log.info("Attempting to squash last %s layers...",
                       number_of_layers)
@@ -228,8 +230,8 @@ class Image(object):
         if (size_after_mb >= size_before_mb):
             self.log.info("If the squashed image is larger than original it means that there were no meaningful files to squash and it just added metadata. Are you sure you specified correct parameters?")
         else:
-            self.log.info("Image size decreased by %.2f %%" % float(((size_before_mb-size_after_mb)/size_before_mb)*100))
-
+            self.log.info("Image size decreased by %.2f %%" % float(
+                ((size_before_mb-size_after_mb)/size_before_mb)*100))
 
     def _dir_size(self, directory):
         size = 0
@@ -354,18 +356,21 @@ class Image(object):
                 if docker.version_info[0] < 3:
                     # Docker library prior to 3.0.0 returned the requests
                     # object directly which cold be used to read from
-                    self.log.debug("Extracting image using HTTPResponse object directly")
+                    self.log.debug(
+                        "Extracting image using HTTPResponse object directly")
                     self._extract_tar(image, directory)
                 else:
                     # Docker library >=3.0.0 returns iterator over raw data
-                    self.log.debug("Extracting image using iterator over raw data")
+                    self.log.debug(
+                        "Extracting image using iterator over raw data")
 
                     fd_r, fd_w = os.pipe()
 
                     r = os.fdopen(fd_r, 'rb')
                     w = os.fdopen(fd_w, 'wb')
 
-                    extracter = threading.Thread(target=self._extract_tar, args=(r,directory))
+                    extracter = threading.Thread(
+                        target=self._extract_tar, args=(r, directory))
                     extracter.start()
 
                     for chunk in image:
@@ -821,7 +826,94 @@ class Image(object):
                                    squashed_files, added_symlinks)
 
             if files_in_layers_to_move:
+                self._reduce(skipped_markers)
+
                 self._add_markers(skipped_markers, squashed_tar,
                                   files_in_layers_to_move, added_symlinks)
 
         self.log.info("Squashing finished!")
+
+    def _reduce(self, markers):
+        """
+        This function is responsible for reducing marker files
+        that are scheduled to be added at the end of squashing to
+        minimum.
+
+        In some cases, one marker file will overlap
+        with others making others not necessary.
+
+        This is not only about adding less marker files, but
+        if we try to add a marker file for a file or directory
+        deeper in the hierarchy of already marked directory,
+        the image will not be successfully loaded back into Docker
+        daemon.
+
+        Passed dictionary containing markers is altered *in-place*.
+
+        Args:
+            markers (dict): Dictionary of markers scheduled to be added.
+        """
+
+        self.log.debug("Reducing marker files to be added back...")
+
+        # Prepare a list of files (or directories) based on the marker
+        # files scheduled to be added
+        marked_files = list(map(lambda x: self._normalize_path(
+            x.name.replace('.wh.', '')), markers.keys()))
+
+        # List of markers that should be not added back to tar file
+        to_remove = []
+
+        for marker in markers.keys():
+            self.log.debug(
+                "Investigating '{}' marker file".format(marker.name))
+
+            path = self._normalize_path(marker.name.replace('.wh.', ''))
+            # Iterate over the path hierarchy, but starting with the
+            # root directory. This will make it possible to remove
+            # marker files based on the highest possible directory level
+            for directory in reversed(self._path_hierarchy(path)):
+                if directory in marked_files:
+                    self.log.debug(
+                        "Marker file '{}' is superseded by higher-level marker file: '{}'".format(marker.name, directory))
+                    to_remove.append(marker)
+                    break
+
+        self.log.debug("Removing {} marker files".format(len(to_remove)))
+
+        if to_remove:
+            for marker in to_remove:
+                self.log.debug("Removing '{}' marker file".format(marker.name))
+                markers.pop(marker)
+
+        self.log.debug("Marker files reduced")
+
+    def _path_hierarchy(self, path):
+        """
+        Creates a full hierarchy of directories for a given path.
+
+        For a particular path, a list will be returned
+        containing paths from the path specified, through all levels
+        up to the root directory.
+
+        Example:
+            Path '/opt/testing/some/dir/structure/file'
+
+            will return:
+
+            ['/opt/testing/some/dir/structure', '/opt/testing/some/dir', '/opt/testing/some', '/opt/testing', '/opt', '/']
+        """
+        if not path:
+            raise SquashError("No path provided to create the hierarchy for")
+
+        hierarchy = []
+
+        dirname = os.path.dirname(path)
+
+        hierarchy.append(dirname)
+
+        # If we are already at root level, stop
+        if dirname != '/':
+            hierarchy.extend(self._path_hierarchy(dirname))
+
+        return hierarchy

@@ -328,5 +328,67 @@ class TestAddMarkers(unittest.TestCase):
         self.assertTrue(tar_info.isfile())
 
 
+class TestReduceMarkers(unittest.TestCase):
+
+    def setUp(self):
+        self.docker_client = mock.Mock()
+        self.log = mock.Mock()
+        self.image = "whatever"
+        self.squash = Image(self.log, self.docker_client, self.image, None)
+
+    def test_should_not_reduce_any_marker_files(self):
+        marker_1 = mock.Mock()
+        type(marker_1).name = mock.PropertyMock(return_value='.wh.some/file')
+        marker_2 = mock.Mock()
+        type(marker_2).name = mock.PropertyMock(return_value='.wh.file2')
+
+        markers = {marker_1: 'filecontent1', marker_2: 'filecontent2'}
+
+        self.squash._reduce(markers)
+
+        assert len(markers) == 2
+        assert markers[marker_1] == 'filecontent1'
+        assert markers[marker_2] == 'filecontent2'
+
+    def test_should_reduce_marker_files(self):
+        marker_1 = mock.Mock()
+        type(marker_1).name = mock.PropertyMock(return_value='opt/.wh.testing')
+        marker_2 = mock.Mock()
+        type(marker_2).name = mock.PropertyMock(
+            return_value='opt/testing/something/.wh.file')
+        marker_3 = mock.Mock()
+        type(marker_3).name = mock.PropertyMock(
+            return_value='opt/testing/something/.wh.other_file')
+
+        markers = {marker_1: 'filecontent1',
+                   marker_2: 'filecontent2', marker_3: 'filecontent3'}
+
+        self.squash._reduce(markers)
+
+        assert len(markers) == 1
+        assert markers[marker_1] == 'filecontent1'
+
+
+class TestPathHierarchy(unittest.TestCase):
+    def setUp(self):
+        self.docker_client = mock.Mock()
+        self.log = mock.Mock()
+        self.image = "whatever"
+        self.squash = Image(self.log, self.docker_client, self.image, None)
+
+    def test_should_prepare_path_hierarchy(self):
+        assert self.squash._path_hierarchy('/opt/testing/some/dir/structure/file') == [
+            '/opt/testing/some/dir/structure', '/opt/testing/some/dir', '/opt/testing/some', '/opt/testing', '/opt', '/']
+
+    def test_should_handle_root(self):
+        assert self.squash._path_hierarchy('/') == ['/']
+
+    def test_should_handle_empty(self):
+        with self.assertRaises(SquashError) as cm:
+            self.squash._path_hierarchy('')
+        self.assertEquals(
+            str(cm.exception), "No path provided to create the hierarchy for")
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -2,6 +2,8 @@
 
 import os
 
+import docker
+
 from distutils.version import StrictVersion
 
 from docker_squash.v1_image import V1Image
@@ -69,17 +71,24 @@ class Squash(object):
     def _cleanup(self):
         try:
             image_id = self.docker.inspect_image(self.image)['Id']
-        except:
-            self.log.warn("Could not get the image ID for %s image, skipping cleanup after squashing" % self.image)
+        except docker.errors.APIError as ex:
+            self.log.warn(
+                "Could not get the image ID for {} image: {}, skipping cleanup after squashing".format(
+                    self.image, str(ex)))
             return
 
-        self.log.info("Removing old %s image..." % self.image)
-        self.docker.remove_image(image_id, force=False, noprune=False)
-        self.log.info("Image removed!")
+        self.log.info("Removing old {} image...".format(self.image))
+
+        try:
+            self.docker.remove_image(image_id, force=False, noprune=False)
+            self.log.info("Image {} removed!".format(self.image))
+        except docker.errors.APIError as ex:
+            self.log.warn(
+                "Could not remove image {}: {}, skipping cleanup after squashing".format(self.image, str(ex)))
 
     def squash(self, image):
         # Do the actual squashing
-        new_image_id = image.squash()
+        new_image_id=image.squash()
 
         self.log.info("New squashed image ID is %s" % new_image_id)
 

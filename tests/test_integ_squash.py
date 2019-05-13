@@ -18,21 +18,24 @@ from docker_squash.lib import common
 if not six.PY3:
     import docker_squash.lib.xtarfile
 
+
 class ImageHelper(object):
     @staticmethod
     def top_layer_path(tar):
-        #tar_object.seek(0)
+        # tar_object.seek(0)
         reader = codecs.getreader("utf-8")
 
         if 'repositories' in tar.getnames():
             repositories_member = tar.getmember('repositories')
-            repositories = json.load(reader(tar.extractfile(repositories_member)))
+            repositories = json.load(
+                reader(tar.extractfile(repositories_member)))
             return repositories.popitem()[1].popitem()[1]
 
         if 'manifest.json' in tar.getnames():
             manifest_member = tar.getmember('manifest.json')
             manifest = json.load(reader(tar.extractfile(manifest_member)))
             return manifest[0]["Layers"][-1].split("/")[0]
+
 
 class IntegSquash(unittest.TestCase):
 
@@ -138,7 +141,8 @@ class IntegSquash(unittest.TestCase):
                         self.tarnames = tar.getnames()
 
                     self.squashed_layer = self._squashed_layer()
-                    self.layers = [o['Id'] for o in self.docker.history(self.image_id)]
+                    self.layers = [o['Id']
+                                   for o in self.docker.history(self.image_id)]
                     self.metadata = self.docker.inspect_image(self.image_id)
 
             return self
@@ -221,6 +225,7 @@ class IntegSquash(unittest.TestCase):
             with tarfile.open(fileobj=self.content, mode='r') as tar:
                 assert name not in tar.getnames(
                 ), "File %s was found in the container files: %s" % (name, tar.getnames())
+
 
 class TestIntegSquash(IntegSquash):
 
@@ -536,8 +541,10 @@ class TestIntegSquash(IntegSquash):
                     all_files = tar.getnames()
 
                     self.assertIn("%s/json" % squashed_layer_path, all_files)
-                    self.assertIn("%s/layer.tar" % squashed_layer_path, all_files)
-                    self.assertIn("%s/VERSION" % squashed_layer_path, all_files)
+                    self.assertIn("%s/layer.tar" %
+                                  squashed_layer_path, all_files)
+                    self.assertIn("%s/VERSION" %
+                                  squashed_layer_path, all_files)
 
     # https://github.com/goldmann/docker-scripts/issues/33
     def test_docker_size_in_metadata_should_be_upper_case(self):
@@ -567,20 +574,24 @@ class TestIntegSquash(IntegSquash):
             with self.SquashedImage(image, 2) as squashed_image:
                 self.assertEqual(
                     len(squashed_image.layers), len(image.layers) - 1)
-                image_data_layers = [s for s in image.tarnames if "layer.tar" in s]
-                squashed_image_data_layers = [s for s in squashed_image.tarnames if "layer.tar" in s]
+                image_data_layers = [
+                    s for s in image.tarnames if "layer.tar" in s]
+                squashed_image_data_layers = [
+                    s for s in squashed_image.tarnames if "layer.tar" in s]
 
                 if 'manifest.json' in image.tarnames:
                     # For v2
                     # For V2 only layers with data contain layer.tar archives
                     # In our test case we did not add any data, so the count should
                     # be the same
-                    self.assertEqual(len(image_data_layers), len(squashed_image_data_layers))
+                    self.assertEqual(len(image_data_layers),
+                                     len(squashed_image_data_layers))
                 else:
                     # For v1
                     # V1 image contains as many layer.tar archives as the image has layers
                     # We squashed 2 layers, so squashed image contains one layer less
-                    self.assertEqual(len(image_data_layers), len(squashed_image_data_layers) + 1)
+                    self.assertEqual(len(image_data_layers), len(
+                        squashed_image_data_layers) + 1)
 
     # This is an edge case where we try to squash last 2 layers
     # but these layers do not create any content on filesystem
@@ -623,7 +634,8 @@ class TestIntegSquash(IntegSquash):
                 with self.SquashedImage(image, 1) as squashed_image:
                     pass
 
-        self.assertEquals(str(cm.exception), 'Single layer marked to squash, no squashing is required')
+        self.assertEquals(
+            str(cm.exception), 'Single layer marked to squash, no squashing is required')
 
     # https://github.com/goldmann/docker-scripts/issues/52
     # Test may be misleading, but squashing all layers makes sure we hit
@@ -660,8 +672,10 @@ class TestIntegSquash(IntegSquash):
                 with self.SquashedImage(image, 20, numeric=True, tmp_dir=tmp_dir, log=log):
                     pass
 
-        log.debug.assert_any_call("Using /tmp/docker-squash-integ-tmp-dir as the temporary directory")
-        log.debug.assert_any_call("Cleaning up /tmp/docker-squash-integ-tmp-dir temporary directory")
+        log.debug.assert_any_call(
+            "Using /tmp/docker-squash-integ-tmp-dir as the temporary directory")
+        log.debug.assert_any_call(
+            "Cleaning up /tmp/docker-squash-integ-tmp-dir temporary directory")
 
         self.assertFalse(os.path.exists(tmp_dir))
 
@@ -682,7 +696,8 @@ class TestIntegSquash(IntegSquash):
                 with self.SquashedImage(image, 20, numeric=True, tmp_dir=tmp_dir, log=log, development=True):
                     pass
 
-        log.debug.assert_any_call("Using /tmp/docker-squash-integ-tmp-dir as the temporary directory")
+        log.debug.assert_any_call(
+            "Using /tmp/docker-squash-integ-tmp-dir as the temporary directory")
 
         self.assertTrue(os.path.exists(tmp_dir))
 
@@ -737,8 +752,10 @@ class TestIntegSquash(IntegSquash):
             with self.SquashedImage(image, 3, numeric=True) as squashed_image:
                 self.assertEqual(
                     len(squashed_image.layers), len(image.layers) - 2)
-                squashed_image.assertFileExists('usr/libexec/git-core/git-remote-ftp')
-                squashed_image.assertFileExists('usr/libexec/git-core/git-remote-http')
+                squashed_image.assertFileExists(
+                    'usr/libexec/git-core/git-remote-ftp')
+                squashed_image.assertFileExists(
+                    'usr/libexec/git-core/git-remote-http')
 
     # https://github.com/goldmann/docker-squash/issues/104
     def test_should_handle_symlinks_to_nonexisting_locations(self):
@@ -940,11 +957,16 @@ class TestIntegSquash(IntegSquash):
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image, 6, numeric=True, output_path="tox.tar") as squashed_image:
                 with self.Container(squashed_image) as container:
-                    container.assertFileExists('data-template/etc/systemd/system/container-ipa.target.wants')
-                    container.assertFileExists('data-template/etc/systemd/system/default.target.wants')
-                    container.assertFileExists('data-template/etc/systemd/system/default.target')
-                    container.assertFileExists('data-template/etc/systemd/system/multi-user.target.wants')
-                    container.assertFileExists('data-template/etc/systemd/system/container-ipa.target.wants/ipa-server-configure-first.service')
+                    container.assertFileExists(
+                        'data-template/etc/systemd/system/container-ipa.target.wants')
+                    container.assertFileExists(
+                        'data-template/etc/systemd/system/default.target.wants')
+                    container.assertFileExists(
+                        'data-template/etc/systemd/system/default.target')
+                    container.assertFileExists(
+                        'data-template/etc/systemd/system/multi-user.target.wants')
+                    container.assertFileExists(
+                        'data-template/etc/systemd/system/container-ipa.target.wants/ipa-server-configure-first.service')
                     container.assertFileExists('etc/systemd/system')
 
 
@@ -1018,6 +1040,7 @@ class NumericValues(IntegSquash):
             self.assertEqual(s_h['CreatedBy'], '')
             self.assertEqual(
                 len(squashed_image.layers), len(NumericValues.image.layers) - 3)
+
 
 if __name__ == '__main__':
     unittest.main()

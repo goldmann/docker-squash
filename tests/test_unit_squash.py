@@ -3,6 +3,8 @@ import mock
 import six
 import logging
 
+import docker
+
 from docker_squash.squash import Squash
 from docker_squash.image import Image
 from docker_squash.errors import SquashError
@@ -37,7 +39,30 @@ class TestSquash(unittest.TestCase):
     @mock.patch('docker_squash.squash.V2Image')
     def test_should_cleanup_after_squashing(self, v2_image):
         self.docker_client.inspect_image.return_value = {'Id': "abcdefgh"}
+
         squash = Squash(self.log, 'image', self.docker_client, load_image=True, cleanup=True)
         squash.run()
 
         self.docker_client.remove_image.assert_called_with('abcdefgh', force=False, noprune=False)
+        self.log.info.assert_any_call("Image image removed!")
+
+    @mock.patch('docker_squash.squash.V2Image')
+    def test_should_handle_cleanup_error_while_getting_image_id(self, v2_image):
+        self.docker_client.inspect_image.side_effect = docker.errors.APIError("Message")
+        
+        squash = Squash(self.log, 'image', self.docker_client, load_image=True, cleanup=True)
+        squash.run()
+
+        self.docker_client.remove_image.assert_not_called()
+        self.log.warn.assert_any_call("Could not get the image ID for image image: Message, skipping cleanup after squashing")
+
+    @mock.patch('docker_squash.squash.V2Image')
+    def test_should_handle_cleanup_error_when_removing_image(self, v2_image):
+        self.docker_client.inspect_image.return_value = {'Id': "abcdefgh"}
+        self.docker_client.remove_image.side_effect = docker.errors.APIError("Message")
+
+        squash = Squash(self.log, 'image', self.docker_client, load_image=True, cleanup=True)
+        squash.run()
+
+        self.log.info.assert_any_call("Removing old image image...")
+        self.log.warn.assert_any_call("Could not remove image image: Message, skipping cleanup after squashing")

@@ -115,6 +115,7 @@ class TestPrepareLayersToSquash(unittest.TestCase):
         self.assertEquals(self.squash._layers_to_squash(
             ['abc', 'def', 'ghi', 'jkl'], 'asdasdasd'), (['abc', 'def', 'ghi', 'jkl'], []))
 
+
 class TestGenerateV1ImageId(unittest.TestCase):
 
     def setUp(self):
@@ -156,7 +157,8 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
             self.squash._generate_repositories_json(
                 'file', image_id, 'name', 'tag')
 
-            self.assertIn(mock.call().write('{"name":{"tag":"12323dferwt4awefq23rasf"}}'), mock_file.mock_calls)
+            self.assertIn(mock.call().write(
+                '{"name":{"tag":"12323dferwt4awefq23rasf"}}'), mock_file.mock_calls)
             self.assertIn(mock.call().write('\n'), mock_file.mock_calls)
 
     def test_handle_empty_image_id(self):
@@ -171,7 +173,8 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
 
     def test_should_not_generate_repositories_if_name_and_tag_is_missing(self):
         self.squash._generate_repositories_json('file', 'abcd', None, None)
-        self.log.debug.assert_called_with("No name and tag provided for the image, skipping generating repositories file")
+        self.log.debug.assert_called_with(
+            "No name and tag provided for the image, skipping generating repositories file")
 
 
 class TestMarkerFiles(unittest.TestCase):
@@ -254,7 +257,8 @@ class TestAddMarkers(unittest.TestCase):
         type(marker_2).name = mock.PropertyMock(return_value='.wh.marker_2')
 
         markers = {marker_1: 'file1', marker_2: 'file2'}
-        self.squash._add_markers(markers, tar, {'1234layerdid': ['/marker_1', '/marker_2']}, [['/marker_1']])
+        self.squash._add_markers(markers, tar, {'1234layerdid': [
+                                 '/marker_1', '/marker_2']}, [['/marker_1']])
 
         self.assertEqual(len(tar.addfile.mock_calls), 1)
         tar_info, marker_file = tar.addfile.call_args[0]
@@ -293,7 +297,8 @@ class TestAddMarkers(unittest.TestCase):
         type(marker_2).name = mock.PropertyMock(return_value='.wh.marker_2')
 
         markers = {marker_1: 'file1', marker_2: 'file2'}
-        self.squash._add_markers(markers, tar, {'1234layerdid': ['some/file', 'marker_1', 'marker_2']}, [])
+        self.squash._add_markers(markers, tar, {'1234layerdid': [
+                                 'some/file', 'marker_1', 'marker_2']}, [])
 
         self.assertTrue(len(tar.addfile.mock_calls) == 0)
 
@@ -311,7 +316,8 @@ class TestAddMarkers(unittest.TestCase):
         markers = {marker_1: 'filecontent1', marker_2: 'filecontent2'}
 
         # List of layers to move (and files in these layers), already normalized
-        self.squash._add_markers(markers, tar, {'1234layerdid': ['/some/file', '/other/file', '/stuff']}, [])
+        self.squash._add_markers(markers, tar, {'1234layerdid': [
+                                 '/some/file', '/other/file', '/stuff']}, [])
 
         self.assertEqual(len(tar.addfile.mock_calls), 1)
         tar_info, marker_file = tar.addfile.call_args[0]

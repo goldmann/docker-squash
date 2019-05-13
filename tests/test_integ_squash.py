@@ -969,6 +969,43 @@ class TestIntegSquash(IntegSquash):
                         'data-template/etc/systemd/system/container-ipa.target.wants/ipa-server-configure-first.service')
                     container.assertFileExists('etc/systemd/system')
 
+    # https://github.com/goldmann/docker-squash/issues/181
+    def test_should_not_add_marker_files_in_already_marked_directories(self):
+        dockerfile = '''
+        FROM {}
+        RUN mkdir -p /opt/testing/some/dir/structure
+        RUN touch /opt/testing/some/dir/structure/1_base_file /opt/testing/some/dir/structure/2_base_file /opt/testing/some/dir/structure/3_base_file
+        RUN rm /opt/testing/some/dir/structure/2_base_file /opt/testing/some/dir/structure/3_base_file
+        RUN touch /opt/testing/some/dir/structure/new_file
+        RUN rm -rf /opt/testing
+        RUN rm -rf /opt
+        '''.format(TestIntegSquash.BUSYBOX_IMAGE)
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 4, numeric=True) as squashed_image:
+                squashed_image.assertFileExists('.wh.opt')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileDoesNotExist('/opt')
+
+    # https://github.com/goldmann/docker-squash/issues/181
+    def test_should_not_add_marker_files_in_already_marked_directories_multiple_removal(self):
+        dockerfile = '''
+        FROM {}
+        RUN mkdir -p /opt/testing/some/dir/structure
+        RUN touch /opt/testing/some/dir/structure/1_base_file /opt/testing/some/dir/structure/2_base_file /opt/testing/some/dir/structure/3_base_file
+        RUN rm /opt/testing/some/dir/structure/2_base_file /opt/testing/some/dir/structure/3_base_file
+        RUN touch /opt/testing/some/dir/structure/new_file
+        RUN rm -rf /opt/testing
+        '''.format(TestIntegSquash.BUSYBOX_IMAGE)
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 3, numeric=True) as squashed_image:
+                squashed_image.assertFileExists('opt/.wh.testing')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileDoesNotExist('/opt/testing')
+
 
 class NumericValues(IntegSquash):
     @classmethod

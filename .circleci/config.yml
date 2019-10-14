@@ -8,7 +8,7 @@ jobs:
       - checkout
       - run: docker version
       - run: docker info
-      - run: pip install tox --user
+      - run: pip install tox zipp==0.5.2 --user
       - run: echo 'export PATH=~/.local/bin:$PATH' >> $BASH_ENV
       - run: pyenv local 2.7.12 3.5.2 3.6.5 3.7.0
       - run: |

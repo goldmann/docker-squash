@@ -713,6 +713,8 @@ class Image(object):
             skipped_files = []
             # List of filenames in the squashed archive
             squashed_files = []
+            # List of opaque directories in the image
+            opaque_dirs = []
 
             for layer_id in layers_to_squash:
                 layer_tar_file = os.path.join(
@@ -730,41 +732,52 @@ class Image(object):
 
                     skipped_sym_link_files = {}
                     skipped_hard_link_files = {}
+                    skipped_files_in_layer = {}
+
                     files_to_skip = []
+                    # List of opaque directories found in this layer
+                    layer_opaque_dirs = []
 
-                    # Iterate over the marker files found for this particular
-                    # layer and if in the squashed layers file corresponding
-                    # to the marker file is found, then skip both files
-                    for marker, marker_file in six.iteritems(markers):
-                        actual_file = marker.name.replace('.wh.', '')
-                        files_to_skip.append(self._normalize_path(actual_file))
-                        skipped_markers[marker] = marker_file
-
-                    self.log.debug(
-                        "Searching for symbolic links in '%s' archive..." % layer_tar_file)
-
-                    # Scan for all symlinks in the layer and save them
-                    # for later processing.
-                    for member in members:
-                        if member.issym():
-                            normalized_name = self._normalize_path(member.name)
-                            skipped_sym_link_files[normalized_name] = member
-                            continue
-
-                    to_skip.append(files_to_skip)
+                    # Add it as early as possible, we will be populating
+                    # 'skipped_sym_link_files' array later
                     skipped_sym_links.append(skipped_sym_link_files)
 
-                    self.log.debug("Done, found %s files" %
-                                   len(skipped_sym_link_files))
-                    skipped_files_in_layer = {}
+                    # Add it as early as possible, we will be populating
+                    # 'files_to_skip' array later
+                    to_skip.append(files_to_skip)
+
+                    # Iterate over marker files found for this particular
+                    # layer and if a file in the squashed layers file corresponding
+                    # to the marker file is found, then skip both files
+                    for marker, marker_file in six.iteritems(markers):
+                        # We have a opaque directory marker file
+                        # https://github.com/opencontainers/image-spec/blob/master/layer.md#opaque-whiteout
+                        if marker.name.endswith('.wh..wh..opq'):
+                            opaque_dir = os.path.dirname(marker.name)
+
+                            self.log.debug(
+                                "Found opaque directory: '%s'" % opaque_dir)
+
+                            layer_opaque_dirs.append(opaque_dir)
+                        else:
+                            files_to_skip.append(
+                                self._normalize_path(marker.name.replace('.wh.', '')))
+
+                            skipped_markers[marker] = marker_file
 
                     # Copy all the files to the new tar
                     for member in members:
-                        # Skip all symlinks, we'll investigate them later
-                        if member.issym():
+                        normalized_name = self._normalize_path(member.name)
+
+                        if self._is_in_opaque_dir(member, opaque_dirs):
+                            self.log.debug(
+                                "Skipping file '%s' because it is in an opaque directory" % normalized_name)
                             continue
 
-                        normalized_name = self._normalize_path(member.name)
+                        # Skip all symlinks, we'll investigate them later
+                        if member.issym():
+                            skipped_sym_link_files[normalized_name] = member
+                            continue
 
                         if member in six.iterkeys(skipped_markers):
                             self.log.debug(
@@ -814,6 +827,7 @@ class Image(object):
 
                     skipped_hard_links.append(skipped_hard_link_files)
                     skipped_files.append(skipped_files_in_layer)
+                    opaque_dirs += layer_opaque_dirs
 
             self._add_hardlinks(squashed_tar, squashed_files,
                                 to_skip, skipped_hard_links)
@@ -832,6 +846,22 @@ class Image(object):
                                   files_in_layers_to_move, added_symlinks)
 
         self.log.info("Squashing finished!")
+
+    def _is_in_opaque_dir(self, member, dirs):
+        """
+        If the member we investigate is an opaque directory
+        or if the member is located inside of the opaque directory,
+        we copy these files as-is. Any other layer that has content
+        on the opaque directory will be ignored!
+        """
+
+        for opaque_dir in dirs:
+            if member.name == opaque_dir or member.name.startswith("%s/" % opaque_dir):
+                self.log.debug("Member '%s' found to be part of opaque directory '%s'" % (
+                    member.name, opaque_dir))
+                return True
+
+        return False
 
     def _reduce(self, markers):
         """

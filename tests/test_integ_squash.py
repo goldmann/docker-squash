@@ -101,6 +101,22 @@ class IntegSquash(unittest.TestCase):
 
             return buf
 
+        def assertFileExistsInLayer(self, name, layer=-1):
+            self.tar.seek(0)  # Rewind
+            reader = codecs.getreader("utf-8")
+
+            with tarfile.open(fileobj=self.tar, mode='r') as tar:
+                manifest_member = tar.getmember("manifest.json")
+                manifest_file = tar.extractfile(manifest_member)
+                manifest = json.load(reader(manifest_file))
+
+                layer_member = tar.getmember(manifest[0]["Layers"][layer])
+                layer_file = tar.extractfile(layer_member)
+
+                with tarfile.open(fileobj=layer_file, mode='r') as layer_tar:
+                    assert name in layer_tar.getnames(
+                    ), "File '%s' was not found in the squashed files: %s" % (name, layer_tar.getnames())
+
     class SquashedImage(object):
 
         def __init__(self, image, number_of_layers=None, output_path=None, load_image=True, numeric=False, tmp_dir=None, log=None, development=False, tag=True):
@@ -809,7 +825,7 @@ class TestIntegSquash(IntegSquash):
         ''' % TestIntegSquash.BUSYBOX_IMAGE
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(image) as squashed_image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
                 squashed_image.assertFileExists('xxx')
 
                 with self.Container(squashed_image) as container:
@@ -1005,6 +1021,53 @@ class TestIntegSquash(IntegSquash):
 
                 with self.Container(squashed_image) as container:
                     container.assertFileDoesNotExist('/opt/testing')
+
+    # https://github.com/goldmann/docker-squash/issues/186
+    def test_should_handle_opaque_dirs(self):
+        dockerfile = '''
+        FROM {}
+        RUN mkdir -p /d1 && touch /d1/foobar
+        RUN rm -rf /d1 && mkdir -p /d1 && touch /d1/foo
+        '''.format(TestIntegSquash.BUSYBOX_IMAGE)
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
+                with self.Container(image) as container:
+                    container.assertFileExists('d1/foo')
+                    container.assertFileDoesNotExist('d1/foobar')
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists('d1/foo')
+                    container.assertFileDoesNotExist('d1/foobar')
+
+    # https://github.com/goldmann/docker-squash/issues/186
+    # https://github.com/opencontainers/image-spec/blob/master/layer.md#whiteouts
+    def test_should_handle_opaque_dirs_spec_example(self):
+        dockerfile = '''
+        FROM {}
+        RUN mkdir -p a/b/c && touch a/b/c/bar
+        RUN rm -rf a && mkdir -p a/b/c && touch a/b/c/foo
+        '''.format(TestIntegSquash.BUSYBOX_IMAGE)
+
+        with self.Image(dockerfile) as image:
+            image.assertFileExistsInLayer('a', -2)
+            image.assertFileExistsInLayer('a/b', -2)
+            image.assertFileExistsInLayer('a/b/c', -2)
+            image.assertFileExistsInLayer('a/b/c/bar', -2)
+
+            image.assertFileExistsInLayer('a')
+            image.assertFileExistsInLayer('a/b')
+            image.assertFileExistsInLayer('a/b/c')
+            image.assertFileExistsInLayer('a/b/c/foo')
+            image.assertFileExistsInLayer('a/.wh..wh..opq')
+
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
+                squashed_image.assertFileExists('a')
+                squashed_image.assertFileExists('a/b')
+                squashed_image.assertFileExists('a/b/c')
+                squashed_image.assertFileExists('a/b/c/foo')
+                squashed_image.assertFileDoesNotExist('a/b/c/bar')
+                squashed_image.assertFileExists('a/.wh..wh..opq')
 
 
 class NumericValues(IntegSquash):

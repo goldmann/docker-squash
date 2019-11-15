@@ -63,7 +63,7 @@ class CLI(object):
         parser.add_argument(
             '-d', '--development', action='store_true', help='Does not clean up after failure for easier debugging')
         parser.add_argument(
-            '-f', '--from-layer', help='ID of the layer or image ID or image name. If not specified will squash all layers in the image')
+            '-f', '--from-layer', help='Number of layers to squash or ID of the layer (or image ID or image name) to squash from. In case the provided value is an integer, specified number of layers will be squashed. Every layer in the image will be squashed if the parameter is not provided.')
         parser.add_argument(
             '-t', '--tag', help="Specify the tag to be used for the new image. If not specified no tag will be applied")
         parser.add_argument(

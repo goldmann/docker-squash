@@ -1,4 +1,4 @@
-``docker-squash``
+`Amazing project.``docker-squash``
 ==================
 
 .. image:: https://circleci.com/gh/goldmann/docker-squash.svg?style=svg

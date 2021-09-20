@@ -1,5 +1,8 @@
 
 import datetime
+import itertools
+import pathlib
+
 import docker
 import hashlib
 import json
@@ -903,7 +906,7 @@ class Image(object):
             # Iterate over the path hierarchy, but starting with the
             # root directory. This will make it possible to remove
             # marker files based on the highest possible directory level
-            for directory in reversed(self._path_hierarchy(path)):
+            for directory in self._path_hierarchy(path):
                 if directory in marked_files:
                     self.log.debug(
                         "Marker file '{}' is superseded by higher-level marker file: '{}'".format(marker.name, directory))
@@ -932,19 +935,15 @@ class Image(object):
 
             will return:
 
-            ['/opt/testing/some/dir/structure', '/opt/testing/some/dir', '/opt/testing/some', '/opt/testing', '/opt', '/']
+            ['/', '/opt', '/opt/testing', '/opt/testing/some', '/opt/testing/some/dir', '/opt/testing/some/dir/structure']
         """
         if not path:
             raise SquashError("No path provided to create the hierarchy for")
 
-        hierarchy = []
+        if not isinstance(path, pathlib.PurePath):
+            path = pathlib.PurePath(path)
 
-        dirname = os.path.dirname(path)
+        if len(path.parts) == 1:
+            return path.parts
 
-        hierarchy.append(dirname)
-
-        # If we are already at root level, stop
-        if dirname != '/':
-            hierarchy.extend(self._path_hierarchy(dirname))
-
-        return hierarchy
+        return itertools.accumulate(path.parts[:-1], func=lambda head, tail: str(path.__class__(head, tail)))

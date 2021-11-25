@@ -41,12 +41,12 @@ class Squash(object):
             raise SquashError("Image is not provided")
 
         if not (self.output_path or self.load_image):
-            self.log.warn(
+            self.log.warning(
                 "No output path specified and loading into Docker is not selected either; squashed image would not accessible, proceeding with squashing doesn't make sense")
             return
 
         if self.output_path and os.path.exists(self.output_path):
-            self.log.warn(
+            self.log.warning(
                 "Path '%s' specified as output path where the squashed image should be saved already exists, it'll be overriden" % self.output_path)
 
         if StrictVersion(docker_version['ApiVersion']) >= StrictVersion("1.22"):
@@ -73,7 +73,7 @@ class Squash(object):
         try:
             image_id = self.docker.inspect_image(self.image)['Id']
         except docker.errors.APIError as ex:
-            self.log.warn(
+            self.log.warning(
                 "Could not get the image ID for {} image: {}, skipping cleanup after squashing".format(
                     self.image, str(ex)))
             return
@@ -84,7 +84,7 @@ class Squash(object):
             self.docker.remove_image(image_id, force=False, noprune=False)
             self.log.info("Image {} removed!".format(self.image))
         except docker.errors.APIError as ex:
-            self.log.warn(
+            self.log.warning(
                 "Could not remove image {}: {}, skipping cleanup after squashing".format(self.image, str(ex)))
 
     def squash(self, image):

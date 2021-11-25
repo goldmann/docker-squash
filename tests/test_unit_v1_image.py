@@ -82,7 +82,7 @@ class TestPrepareTemporaryDirectory(unittest.TestCase):
     def test_should_raise_if_directory_already_exists(self, mock_path, mock_tempfile):
         with self.assertRaises(SquashError) as cm:
             self.squash._prepare_tmp_directory('tmp')
-        self.assertEquals(
+        self.assertEqual(
             str(cm.exception), "The 'tmp' directory already exists, please remove it before you proceed")
         mock_path.assert_called_with('tmp')
         self.assertTrue(len(mock_tempfile.mkdtemp.mock_calls) == 0)
@@ -105,14 +105,14 @@ class TestPrepareLayersToSquash(unittest.TestCase):
 
     # The order is from oldest to newest
     def test_should_generate_list_of_layers(self):
-        self.assertEquals(self.squash._layers_to_squash(
+        self.assertEqual(self.squash._layers_to_squash(
             ['abc', 'def', 'ghi', 'jkl'], 'def'), (['ghi', 'jkl'], ['abc', 'def']))
 
     def test_should_not_fail_with_empty_list_of_layers(self):
-        self.assertEquals(self.squash._layers_to_squash([], 'def'), ([], []))
+        self.assertEqual(self.squash._layers_to_squash([], 'def'), ([], []))
 
     def test_should_return_all_layers_if_from_layer_is_not_found(self):
-        self.assertEquals(self.squash._layers_to_squash(
+        self.assertEqual(self.squash._layers_to_squash(
             ['abc', 'def', 'ghi', 'jkl'], 'asdasdasd'), (['abc', 'def', 'ghi', 'jkl'], []))
 
 
@@ -126,8 +126,8 @@ class TestGenerateV1ImageId(unittest.TestCase):
 
     def test_should_generate_id(self):
         image_id = self.squash._generate_image_id()
-        self.assertEquals(len(image_id), 64)
-        self.assertEquals(isinstance(image_id, str), True)
+        self.assertEqual(len(image_id), 64)
+        self.assertEqual(isinstance(image_id, str), True)
 
     @mock.patch('docker_squash.image.hashlib.sha256')
     def test_should_generate_id_that_is_not_integer_shen_shortened(self, mock_random):
@@ -139,8 +139,8 @@ class TestGenerateV1ImageId(unittest.TestCase):
 
         mock_random.side_effect = [first_pass, second_pass]
         image_id = self.squash._generate_image_id()
-        self.assertEquals(mock_random.call_count, 2)
-        self.assertEquals(len(image_id), 64)
+        self.assertEqual(mock_random.call_count, 2)
+        self.assertEqual(len(image_id), 64)
 
 
 class TestGenerateRepositoriesJSON(unittest.TestCase):
@@ -167,7 +167,7 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
                 self.squash._generate_repositories_json(
                     'file', None, 'name', 'tag')
 
-            self.assertEquals(
+            self.assertEqual(
                 str(cm.exception), 'Provided image id cannot be null')
             mock_file().write.assert_not_called()
 
@@ -386,7 +386,7 @@ class TestPathHierarchy(unittest.TestCase):
     def test_should_handle_empty(self):
         with self.assertRaises(SquashError) as cm:
             self.squash._path_hierarchy('')
-        self.assertEquals(
+        self.assertEqual(
             str(cm.exception), "No path provided to create the hierarchy for")
 
 

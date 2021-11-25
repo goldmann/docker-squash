@@ -15,6 +15,9 @@ test-py36: prepare
 test-py37: prepare
 	tox -e py37 -- tests
 
+test-py311: prepare
+	tox -e py311 -- tests
+
 test-unit: prepare
 	tox -- tests/test_unit*
 

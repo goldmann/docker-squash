@@ -108,7 +108,7 @@ class Image(object):
 
     def _squash_id(self, layer):
         if layer == "<missing>":
-            self.log.warn(
+            self.log.warning(
                 "You try to squash from layer that does not have it's own ID, we'll try to find it later")
             return None
 
@@ -389,7 +389,7 @@ class Image(object):
                 return True
             except Exception as e:
                 self.log.exception(e)
-                self.log.warn(
+                self.log.warning(
                     "An error occured while saving the %s image, retrying..." % image_id)
 
         raise SquashError("Couldn't save %s image!" % image_id)

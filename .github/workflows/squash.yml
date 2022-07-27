@@ -1,0 +1,43 @@
+name: Squash tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [2.7, 3.5, 3.6, 3.7, "3.11.0-alpha.2"]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup
+        run: |
+          sudo apt-get update
+          pip install -U pip
+          PV=${{ matrix.python-version }}
+          if [ "$PV" == "2.7" ]; then
+            pip install tox zipp==0.5.2 --user
+          else
+            pip install tox --user
+          fi
+      - name: Info
+        run: |
+          docker version
+          docker info
+          python -c "import sys; print(sys.version)"
+      - name: Run tests
+        run: |
+          PV=$(echo ${{ matrix.python-version }} | cut -f1,2 -d'.' | tr -d '.')
+          echo "Running tests for Python version ${{ matrix.python-version }}"
+          make test-py"${PV}"

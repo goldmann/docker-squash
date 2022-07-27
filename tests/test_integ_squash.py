@@ -39,7 +39,7 @@ class ImageHelper(object):
 
 class IntegSquash(unittest.TestCase):
 
-    BUSYBOX_IMAGE = "busybox:1.24"
+    BUSYBOX_IMAGE = "busybox:1.34"
 
     log = logging.getLogger()
     handler = logging.StreamHandler()
@@ -115,7 +115,7 @@ class IntegSquash(unittest.TestCase):
 
                 with tarfile.open(fileobj=layer_file, mode='r') as layer_tar:
                     assert name in layer_tar.getnames(
-                    ), "File '%s' was not found in the squashed files: %s" % (name, layer_tar.getnames())
+                    ), "File '%s' was not found in layer files: %s" % (name, layer_tar.getnames())
 
     class SquashedImage(object):
 
@@ -575,7 +575,7 @@ class TestIntegSquash(IntegSquash):
                 self.assertEqual(
                     len(squashed_image.layers), len(image.layers) - 1)
                 self.assertIsInstance(image.metadata['Size'], int)
-                with self.assertRaisesRegexp(KeyError, "'size'"):
+                with six.assertRaisesRegex(self, KeyError, "'size'"):
                     self.assertEqual(image.metadata['size'], None)
 
     def test_handle_correctly_squashing_layers_without_data(self):
@@ -650,7 +650,7 @@ class TestIntegSquash(IntegSquash):
                 with self.SquashedImage(image, 1) as squashed_image:
                     pass
 
-        self.assertEquals(
+        self.assertEqual(
             str(cm.exception), 'Single layer marked to squash, no squashing is required')
 
     # https://github.com/goldmann/docker-scripts/issues/52
@@ -684,7 +684,7 @@ class TestIntegSquash(IntegSquash):
         self.assertFalse(os.path.exists(tmp_dir))
 
         with self.Image(dockerfile) as image:
-            with self.assertRaisesRegexp(SquashError, "Cannot squash 20 layers, the .* image contains only \d layers"):
+            with six.assertRaisesRegex(self, SquashError, r"Cannot squash 20 layers, the .* image contains only \d layers"):
                 with self.SquashedImage(image, 20, numeric=True, tmp_dir=tmp_dir, log=log):
                     pass
 
@@ -708,7 +708,7 @@ class TestIntegSquash(IntegSquash):
         self.assertFalse(os.path.exists(tmp_dir))
 
         with self.Image(dockerfile) as image:
-            with self.assertRaisesRegexp(SquashError, "Cannot squash 20 layers, the .* image contains only \d layers"):
+            with six.assertRaisesRegex(self, SquashError, r"Cannot squash 20 layers, the .* image contains only \d layers"):
                 with self.SquashedImage(image, 20, numeric=True, tmp_dir=tmp_dir, log=log, development=True):
                     pass
 
@@ -733,7 +733,7 @@ class TestIntegSquash(IntegSquash):
     # TODO: try not to use centos:6.6 image - this slows down testsuite
     def test_should_not_fail_with_hard_links_to_files_gh_99(self):
         dockerfile = '''
-        FROM centos:6.6
+        FROM centos:7
         RUN yum -y update bind-utils
         RUN yum clean all
         '''
@@ -1046,28 +1046,29 @@ class TestIntegSquash(IntegSquash):
         dockerfile = '''
         FROM {}
         RUN mkdir -p a/b/c && touch a/b/c/bar
-        RUN rm -rf a && mkdir -p a/b/c && touch a/b/c/foo
+        RUN rm -rf a
+        RUN mkdir -p a/b/c && touch a/b/c/foo
         '''.format(TestIntegSquash.BUSYBOX_IMAGE)
 
         with self.Image(dockerfile) as image:
-            image.assertFileExistsInLayer('a', -2)
-            image.assertFileExistsInLayer('a/b', -2)
-            image.assertFileExistsInLayer('a/b/c', -2)
-            image.assertFileExistsInLayer('a/b/c/bar', -2)
+            image.assertFileExistsInLayer('a', -3)
+            image.assertFileExistsInLayer('a/b', -3)
+            image.assertFileExistsInLayer('a/b/c', -3)
+            image.assertFileExistsInLayer('a/b/c/bar', -3)
+
+            image.assertFileExistsInLayer('.wh.a', -2)
 
             image.assertFileExistsInLayer('a')
             image.assertFileExistsInLayer('a/b')
             image.assertFileExistsInLayer('a/b/c')
             image.assertFileExistsInLayer('a/b/c/foo')
-            image.assertFileExistsInLayer('a/.wh..wh..opq')
 
-            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
+            with self.SquashedImage(image, 3, numeric=True) as squashed_image:
                 squashed_image.assertFileExists('a')
                 squashed_image.assertFileExists('a/b')
                 squashed_image.assertFileExists('a/b/c')
                 squashed_image.assertFileExists('a/b/c/foo')
                 squashed_image.assertFileDoesNotExist('a/b/c/bar')
-                squashed_image.assertFileExists('a/.wh..wh..opq')
 
 
 class NumericValues(IntegSquash):
@@ -1088,22 +1089,22 @@ class NumericValues(IntegSquash):
         IntegSquash.cleanup_image()
 
     def test_should_not_squash_more_layers_than_image_has(self):
-        with self.assertRaisesRegexp(SquashError, "Cannot squash 20 layers, the .* image contains only \d layers"):
+        with six.assertRaisesRegex(self, SquashError, r"Cannot squash 20 layers, the .* image contains only \d layers"):
             with self.SquashedImage(NumericValues.image, 20, numeric=True):
                 pass
 
     def test_should_not_squash_negative_number_of_layers(self):
-        with self.assertRaisesRegexp(SquashError, "Number of layers to squash cannot be less or equal 0, provided: -1"):
+        with six.assertRaisesRegex(self, SquashError, "Number of layers to squash cannot be less or equal 0, provided: -1"):
             with self.SquashedImage(NumericValues.image, -1, numeric=True):
                 pass
 
     def test_should_not_squash_zero_number_of_layers(self):
-        with self.assertRaisesRegexp(SquashError, "Number of layers to squash cannot be less or equal 0, provided: 0"):
+        with six.assertRaisesRegex(self, SquashError, "Number of layers to squash cannot be less or equal 0, provided: 0"):
             with self.SquashedImage(NumericValues.image, 0, numeric=True):
                 pass
 
     def test_should_not_squash_single_layer(self):
-        with self.assertRaisesRegexp(SquashUnnecessaryError, "Single layer marked to squash, no squashing is required"):
+        with six.assertRaisesRegex(self, SquashUnnecessaryError, "Single layer marked to squash, no squashing is required"):
             with self.SquashedImage(NumericValues.image, 1, numeric=True):
                 pass
 

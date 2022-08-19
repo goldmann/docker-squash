@@ -354,7 +354,7 @@ class Image(object):
             try:
                 image = self.docker.get_image(image_id)
 
-                if docker.version_info[0] < 3:
+                if int(docker.__version__.split('.')[0]) < 3:
                     # Docker library prior to 3.0.0 returned the requests
                     # object directly which cold be used to read from
                     self.log.debug(

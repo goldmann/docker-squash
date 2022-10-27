@@ -15,6 +15,15 @@ test-py36: prepare
 test-py37: prepare
 	tox -e py37 -- tests
 
+test-py38: prepare
+	tox -e py38 -- tests
+
+test-py39: prepare
+	tox -e py39 -- tests
+
+test-py310: prepare
+	tox -e py310 -- tests
+
 test-py311: prepare
 	tox -e py311 -- tests
 
@@ -43,5 +52,3 @@ release: clean
 	python setup.py sdist
 	twine check dist/*
 	twine upload dist/*
-	
-	

@@ -13,6 +13,7 @@ pytest-cov = "*"
 mock = "*"
 tox-pyenv = "*"
 tox-pipenv = "*"
+twine = "*"
 
 [requires]
 python_version = "*"

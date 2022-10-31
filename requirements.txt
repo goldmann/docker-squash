@@ -1,5 +1,2 @@
 docker
 six
-mock
-pluggy
-tox

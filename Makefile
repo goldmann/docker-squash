@@ -3,9 +3,6 @@ CIRCLE_NODE_INDEX ?= 0
 test: prepare
 	tox -- tests
 
-test-py27: prepare
-	tox -e py27 -- tests
-
 test-py35: prepare
 	tox -e py35 -- tests
 

@@ -41,6 +41,8 @@ From PyPi
 
     $ pip install docker-squash
 
+It is supported on Python 3.5 and above.
+
 Usage
 -----
 
@@ -62,10 +64,14 @@ Usage
       --version             Show version and exit
       -d, --development     Does not clean up after failure for easier debugging
       -f FROM_LAYER, --from-layer FROM_LAYER
-                            ID of the layer or image ID or image name. If not
-                            specified will squash all layers in the image
-      -t TAG, --tag TAG     Specify the tag to be used for the new image. By
-                            default it'll be set to 'image' argument
+                            Number of layers to squash or ID of the layer (or image ID or image name) to squash from.
+                            In case the provided value is an integer, specified number of layers will be squashed.
+                            Every layer in the image will be squashed if the parameter is not provided.
+      -t TAG, --tag TAG     Specify the tag to be used for the new image. If not
+                            specified no tag will be applied
+      -m MESSAGE, --message MESSAGE
+                            Specify a commit message (comment) for the new image.
+      -c, --cleanup         Remove source image from Docker after squashing
       --tmp-dir TMP_DIR     Temporary directory to be created and used
       --output-path OUTPUT_PATH
                             Path where the image should be stored after squashing.
@@ -86,26 +92,26 @@ We start with image like this:
 
     $ docker history jboss/wildfly:latest
     IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
-    25954e6d2300        3 weeks ago         /bin/sh -c #(nop) CMD ["/opt/jboss/wildfly/bi   0 B                 
-    5ae69cb454a5        3 weeks ago         /bin/sh -c #(nop) EXPOSE 8080/tcp               0 B                 
-    dc24712f35c4        3 weeks ago         /bin/sh -c #(nop) ENV LAUNCH_JBOSS_IN_BACKGRO   0 B                 
-    d929129d4c8e        3 weeks ago         /bin/sh -c cd $HOME     && curl -O https://do   160.8 MB            
-    b8fa3caf7d6d        3 weeks ago         /bin/sh -c #(nop) ENV JBOSS_HOME=/opt/jboss/w   0 B                 
-    38b8f85e74bf        3 weeks ago         /bin/sh -c #(nop) ENV WILDFLY_SHA1=c0dd7552c5   0 B                 
-    ae79b646b9a9        3 weeks ago         /bin/sh -c #(nop) ENV WILDFLY_VERSION=10.0.0.   0 B                 
-    2b4606dc9dc7        3 weeks ago         /bin/sh -c #(nop) ENV JAVA_HOME=/usr/lib/jvm/   0 B                 
-    118fa9e33576        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B                 
-    5f7e8f36c3bb        3 weeks ago         /bin/sh -c yum -y install java-1.8.0-openjdk-   197.4 MB            
-    3d4d0228f161        3 weeks ago         /bin/sh -c #(nop) USER [root]                   0 B                 
-    f7ab4ea19708        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B                 
-    4bb15f3b6977        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B                 
-    5dc1e49f4361        3 weeks ago         /bin/sh -c #(nop) WORKDIR /opt/jboss            0 B                 
-    7f0f9eb31174        3 weeks ago         /bin/sh -c groupadd -r jboss -g 1000 && usera   4.349 kB            
-    bd515f044af7        3 weeks ago         /bin/sh -c yum update -y && yum -y install xm   25.18 MB            
-    b78336099045        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B                 
-    4816a298548c        3 weeks ago         /bin/sh -c #(nop) CMD ["/bin/bash"]             0 B                 
-    6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B                 
-    474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB            
+    25954e6d2300        3 weeks ago         /bin/sh -c #(nop) CMD ["/opt/jboss/wildfly/bi   0 B
+    5ae69cb454a5        3 weeks ago         /bin/sh -c #(nop) EXPOSE 8080/tcp               0 B
+    dc24712f35c4        3 weeks ago         /bin/sh -c #(nop) ENV LAUNCH_JBOSS_IN_BACKGRO   0 B
+    d929129d4c8e        3 weeks ago         /bin/sh -c cd $HOME     && curl -O https://do   160.8 MB
+    b8fa3caf7d6d        3 weeks ago         /bin/sh -c #(nop) ENV JBOSS_HOME=/opt/jboss/w   0 B
+    38b8f85e74bf        3 weeks ago         /bin/sh -c #(nop) ENV WILDFLY_SHA1=c0dd7552c5   0 B
+    ae79b646b9a9        3 weeks ago         /bin/sh -c #(nop) ENV WILDFLY_VERSION=10.0.0.   0 B
+    2b4606dc9dc7        3 weeks ago         /bin/sh -c #(nop) ENV JAVA_HOME=/usr/lib/jvm/   0 B
+    118fa9e33576        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B
+    5f7e8f36c3bb        3 weeks ago         /bin/sh -c yum -y install java-1.8.0-openjdk-   197.4 MB
+    3d4d0228f161        3 weeks ago         /bin/sh -c #(nop) USER [root]                   0 B
+    f7ab4ea19708        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B
+    4bb15f3b6977        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B
+    5dc1e49f4361        3 weeks ago         /bin/sh -c #(nop) WORKDIR /opt/jboss            0 B
+    7f0f9eb31174        3 weeks ago         /bin/sh -c groupadd -r jboss -g 1000 && usera   4.349 kB
+    bd515f044af7        3 weeks ago         /bin/sh -c yum update -y && yum -y install xm   25.18 MB
+    b78336099045        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B
+    4816a298548c        3 weeks ago         /bin/sh -c #(nop) CMD ["/bin/bash"]             0 B
+    6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B
+    474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB
     1544084fad81        6 months ago        /bin/sh -c #(nop) MAINTAINER The CentOS Proje   0 B
 
 And we want to squash all the layers down to layer ``4bb15f3b6977``.
@@ -147,15 +153,15 @@ We can now confirm the layer structure:
 
     $ docker history jboss/wildfly:squashed
     IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
-    52255e75d3eb        40 seconds ago                                                      358.2 MB            
-    4bb15f3b6977        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B                 
-    5dc1e49f4361        3 weeks ago         /bin/sh -c #(nop) WORKDIR /opt/jboss            0 B                 
-    7f0f9eb31174        3 weeks ago         /bin/sh -c groupadd -r jboss -g 1000 && usera   4.349 kB            
-    bd515f044af7        3 weeks ago         /bin/sh -c yum update -y && yum -y install xm   25.18 MB            
-    b78336099045        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B                 
-    4816a298548c        3 weeks ago         /bin/sh -c #(nop) CMD ["/bin/bash"]             0 B                 
-    6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B                 
-    474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB            
+    52255e75d3eb        40 seconds ago                                                      358.2 MB
+    4bb15f3b6977        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B
+    5dc1e49f4361        3 weeks ago         /bin/sh -c #(nop) WORKDIR /opt/jboss            0 B
+    7f0f9eb31174        3 weeks ago         /bin/sh -c groupadd -r jboss -g 1000 && usera   4.349 kB
+    bd515f044af7        3 weeks ago         /bin/sh -c yum update -y && yum -y install xm   25.18 MB
+    b78336099045        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B
+    4816a298548c        3 weeks ago         /bin/sh -c #(nop) CMD ["/bin/bash"]             0 B
+    6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B
+    474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB
     1544084fad81        6 months ago        /bin/sh -c #(nop) MAINTAINER The CentOS Proje   0 B
 
 Other option is to specify how many layers (counting from the newest layer) we want to squash.\
@@ -196,16 +202,16 @@ Let's confirm the image structure now:
 
     $ docker history jboss/wildfly:squashed
     IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
-    fde7edd2e568        32 seconds ago                                                      358.2 MB            
-    3d4d0228f161        3 weeks ago         /bin/sh -c #(nop) USER [root]                   0 B                 
-    f7ab4ea19708        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B                 
-    4bb15f3b6977        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B                 
-    5dc1e49f4361        3 weeks ago         /bin/sh -c #(nop) WORKDIR /opt/jboss            0 B                 
-    7f0f9eb31174        3 weeks ago         /bin/sh -c groupadd -r jboss -g 1000 && usera   4.349 kB            
-    bd515f044af7        3 weeks ago         /bin/sh -c yum update -y && yum -y install xm   25.18 MB            
-    b78336099045        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B                 
-    4816a298548c        3 weeks ago         /bin/sh -c #(nop) CMD ["/bin/bash"]             0 B                 
-    6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B                 
-    474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB            
+    fde7edd2e568        32 seconds ago                                                      358.2 MB
+    3d4d0228f161        3 weeks ago         /bin/sh -c #(nop) USER [root]                   0 B
+    f7ab4ea19708        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B
+    4bb15f3b6977        3 weeks ago         /bin/sh -c #(nop) USER [jboss]                  0 B
+    5dc1e49f4361        3 weeks ago         /bin/sh -c #(nop) WORKDIR /opt/jboss            0 B
+    7f0f9eb31174        3 weeks ago         /bin/sh -c groupadd -r jboss -g 1000 && usera   4.349 kB
+    bd515f044af7        3 weeks ago         /bin/sh -c yum update -y && yum -y install xm   25.18 MB
+    b78336099045        3 weeks ago         /bin/sh -c #(nop) MAINTAINER Marek Goldmann <   0 B
+    4816a298548c        3 weeks ago         /bin/sh -c #(nop) CMD ["/bin/bash"]             0 B
+    6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B
+    474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB
     1544084fad81        6 months ago        /bin/sh -c #(nop) MAINTAINER The CentOS Proje   0 B
 

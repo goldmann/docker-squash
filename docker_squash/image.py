@@ -927,8 +927,8 @@ class Image(object):
         Creates a full hierarchy of directories for a given path.
 
         For a particular path, a list will be returned
-        containing paths from the path specified, through all levels
-        up to the root directory.
+        containing paths from the root directory, through all
+        levels up to the path specified.
 
         Example:
             Path '/opt/testing/some/dir/structure/file'

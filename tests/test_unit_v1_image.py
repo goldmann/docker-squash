@@ -1,3 +1,6 @@
+import pathlib
+import sys
+
 import unittest
 import mock
 import six
@@ -258,7 +261,7 @@ class TestAddMarkers(unittest.TestCase):
 
         markers = {marker_1: 'file1', marker_2: 'file2'}
         self.squash._add_markers(markers, tar, {'1234layerdid': [
-                                 '/marker_1', '/marker_2']}, [['/marker_1']])
+            '/marker_1', '/marker_2']}, [['/marker_1']])
 
         self.assertEqual(len(tar.addfile.mock_calls), 1)
         tar_info, marker_file = tar.addfile.call_args[0]
@@ -298,7 +301,7 @@ class TestAddMarkers(unittest.TestCase):
 
         markers = {marker_1: 'file1', marker_2: 'file2'}
         self.squash._add_markers(markers, tar, {'1234layerdid': [
-                                 'some/file', 'marker_1', 'marker_2']}, [])
+            'some/file', 'marker_1', 'marker_2']}, [])
 
         self.assertTrue(len(tar.addfile.mock_calls) == 0)
 
@@ -317,7 +320,7 @@ class TestAddMarkers(unittest.TestCase):
 
         # List of layers to move (and files in these layers), already normalized
         self.squash._add_markers(markers, tar, {'1234layerdid': [
-                                 '/some/file', '/other/file', '/stuff']}, [])
+            '/some/file', '/other/file', '/stuff']}, [])
 
         self.assertEqual(len(tar.addfile.mock_calls), 1)
         tar_info, marker_file = tar.addfile.call_args[0]
@@ -377,17 +380,39 @@ class TestPathHierarchy(unittest.TestCase):
         self.squash = Image(self.log, self.docker_client, self.image, None)
 
     def test_should_prepare_path_hierarchy(self):
-        assert self.squash._path_hierarchy('/opt/testing/some/dir/structure/file') == [
-            '/opt/testing/some/dir/structure', '/opt/testing/some/dir', '/opt/testing/some', '/opt/testing', '/opt', '/']
+        actual = self.squash._path_hierarchy(pathlib.PurePosixPath('/opt/testing/some/dir/structure/file'))
+        expected = [
+            '/',
+            '/opt',
+            '/opt/testing',
+            '/opt/testing/some',
+            '/opt/testing/some/dir',
+            '/opt/testing/some/dir/structure'
+        ]
+        self.assertEqual(expected, list(actual))
 
     def test_should_handle_root(self):
-        assert self.squash._path_hierarchy('/') == ['/']
+        actual = self.squash._path_hierarchy(pathlib.PurePosixPath('/'))
+        self.assertEqual(['/'], list(actual))
 
     def test_should_handle_empty(self):
         with self.assertRaises(SquashError) as cm:
             self.squash._path_hierarchy('')
         self.assertEqual(
             str(cm.exception), "No path provided to create the hierarchy for")
+
+    def test_should_handle_windows_path(self):
+        expected = [
+            'C:\\',
+            'C:\\Windows',
+            'C:\\Windows\\System32',
+            'C:\\Windows\\System32\\drivers',
+            'C:\\Windows\\System32\\drivers\\etc',
+        ]
+        actual = self.squash._path_hierarchy(
+            pathlib.PureWindowsPath('C:\\Windows\\System32\\drivers\\etc\\hosts'))
+
+        self.assertEqual(expected, list(actual))
 
 
 if __name__ == '__main__':

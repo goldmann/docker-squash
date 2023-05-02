@@ -5,14 +5,11 @@ verify_ssl = true
 
 [packages]
 docker = "*"
-six = "*"
 
 [dev-packages]
 pytest = "*"
 pytest-cov = "*"
 mock = "*"
-tox-pyenv = "*"
-tox-pipenv = "*"
 twine = "*"
 
 [requires]

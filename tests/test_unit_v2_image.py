@@ -1,12 +1,9 @@
+import builtins
 import unittest
 import mock
-import six
-import tarfile
 
 from collections import OrderedDict
 from docker_squash.v2_image import V2Image
-from docker_squash.image import Image
-from docker_squash.errors import SquashError
 
 
 class TestReadingConfigFiles(unittest.TestCase):
@@ -20,7 +17,7 @@ class TestReadingConfigFiles(unittest.TestCase):
     def test_should_read_json_file(self):
         manifest_example = '[{"Config":"96bdd3be20fa51b22dc9aaf996b49d403a403adf96e35d7e8b98519267c21c21.json","RepoTags":["busybox-to-squash:squashed"],"Layers":["980a6c63f88351bea42851fc101e4e2f61b12e1bf70122aad1f25186a736a404/layer.tar","977b2156300ec11226ffc7f9382e2fe4ec10a9cdfe445e062542b430aa09d82d/layer.tar","8a646a2ab402ca2774063c602182ad22c09d4af236ed84bdddb6d1205309accf/layer.tar"]}]'
 
-        with mock.patch.object(six.moves.builtins, 'open', mock.mock_open(read_data=manifest_example)) as mock_file:
+        with mock.patch.object(builtins, 'open', mock.mock_open(read_data=manifest_example)) as mock_file:
             manifest = self.image._read_json_file("/tmp/old/manifest.json")
 
         # Manifest is an array
@@ -126,7 +123,7 @@ class TestGeneratingMetadata(unittest.TestCase):
 
         layer_config = '{"created": "old_created", "config": {"Image": "old_id"}, "container": "container_id"}'
 
-        with mock.patch.object(six.moves.builtins, 'open', mock.mock_open(read_data=layer_config)) as mock_file:
+        with mock.patch.object(builtins, 'open', mock.mock_open(read_data=layer_config)) as mock_file:
             metadata = self.image._generate_last_layer_metadata(
                 "squashed_layer_path_id")
 

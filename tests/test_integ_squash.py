@@ -1,22 +1,17 @@
 import unittest
 import mock
-import six
 import codecs
 import os
 import json
 import logging
 import shutil
 import tarfile
-import io
 from io import BytesIO
 import uuid
 
 from docker_squash.squash import Squash
 from docker_squash.errors import SquashError, SquashUnnecessaryError
 from docker_squash.lib import common
-
-if not six.PY3:
-    import docker_squash.lib.xtarfile
 
 
 class ImageHelper(object):
@@ -575,7 +570,7 @@ class TestIntegSquash(IntegSquash):
                 self.assertEqual(
                     len(squashed_image.layers), len(image.layers) - 1)
                 self.assertIsInstance(image.metadata['Size'], int)
-                with six.assertRaisesRegex(self, KeyError, "'size'"):
+                with self.assertRaisesRegex(KeyError, "'size'"):
                     self.assertEqual(image.metadata['size'], None)
 
     def test_handle_correctly_squashing_layers_without_data(self):
@@ -684,7 +679,8 @@ class TestIntegSquash(IntegSquash):
         self.assertFalse(os.path.exists(tmp_dir))
 
         with self.Image(dockerfile) as image:
-            with six.assertRaisesRegex(self, SquashError, r"Cannot squash 20 layers, the .* image contains only \d layers"):
+            with self.assertRaisesRegex(SquashError, r"Cannot squash 20 layers, the .* image contains only \d "
+                                                       r"layers"):
                 with self.SquashedImage(image, 20, numeric=True, tmp_dir=tmp_dir, log=log):
                     pass
 
@@ -708,7 +704,8 @@ class TestIntegSquash(IntegSquash):
         self.assertFalse(os.path.exists(tmp_dir))
 
         with self.Image(dockerfile) as image:
-            with six.assertRaisesRegex(self, SquashError, r"Cannot squash 20 layers, the .* image contains only \d layers"):
+            with self.assertRaisesRegex(SquashError, r"Cannot squash 20 layers, the .* image contains only \d "
+                                                       r"layers"):
                 with self.SquashedImage(image, 20, numeric=True, tmp_dir=tmp_dir, log=log, development=True):
                     pass
 
@@ -734,7 +731,6 @@ class TestIntegSquash(IntegSquash):
     def test_should_not_fail_with_hard_links_to_files_gh_99(self):
         dockerfile = '''
         FROM centos:7
-        RUN yum -y update bind-utils
         RUN yum clean all
         '''
 
@@ -1089,22 +1085,22 @@ class NumericValues(IntegSquash):
         IntegSquash.cleanup_image()
 
     def test_should_not_squash_more_layers_than_image_has(self):
-        with six.assertRaisesRegex(self, SquashError, r"Cannot squash 20 layers, the .* image contains only \d layers"):
+        with self.assertRaisesRegex( SquashError, r"Cannot squash 20 layers, the .* image contains only \d layers"):
             with self.SquashedImage(NumericValues.image, 20, numeric=True):
                 pass
 
     def test_should_not_squash_negative_number_of_layers(self):
-        with six.assertRaisesRegex(self, SquashError, "Number of layers to squash cannot be less or equal 0, provided: -1"):
+        with self.assertRaisesRegex( SquashError, "Number of layers to squash cannot be less or equal 0, provided: -1"):
             with self.SquashedImage(NumericValues.image, -1, numeric=True):
                 pass
 
     def test_should_not_squash_zero_number_of_layers(self):
-        with six.assertRaisesRegex(self, SquashError, "Number of layers to squash cannot be less or equal 0, provided: 0"):
+        with self.assertRaisesRegex( SquashError, "Number of layers to squash cannot be less or equal 0, provided: 0"):
             with self.SquashedImage(NumericValues.image, 0, numeric=True):
                 pass
 
     def test_should_not_squash_single_layer(self):
-        with six.assertRaisesRegex(self, SquashUnnecessaryError, "Single layer marked to squash, no squashing is required"):
+        with self.assertRaisesRegex( SquashUnnecessaryError, "Single layer marked to squash, no squashing is required"):
             with self.SquashedImage(NumericValues.image, 1, numeric=True):
                 pass
 

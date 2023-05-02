@@ -25,12 +25,7 @@ jobs:
         run: |
           sudo apt-get update
           pip install -U pip
-          PV=${{ matrix.python-version }}
-          if [ "$PV" == "2.7" ]; then
-            pip install tox zipp==0.5.2 --user
-          else
-            pip install tox --user
-          fi
+          pip install "tox<4.0.0"
       - name: Info
         run: |
           docker version

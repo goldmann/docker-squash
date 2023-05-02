@@ -1,12 +1,9 @@
 import unittest
 import mock
-import six
-import logging
 
 import docker
 
 from docker_squash.squash import Squash
-from docker_squash.image import Image
 from docker_squash.errors import SquashError
 
 
@@ -49,7 +46,7 @@ class TestSquash(unittest.TestCase):
     @mock.patch('docker_squash.squash.V2Image')
     def test_should_handle_cleanup_error_while_getting_image_id(self, v2_image):
         self.docker_client.inspect_image.side_effect = docker.errors.APIError("Message")
-        
+
         squash = Squash(self.log, 'image', self.docker_client, load_image=True, cleanup=True)
         squash.run()
 

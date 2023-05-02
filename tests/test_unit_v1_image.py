@@ -1,12 +1,10 @@
+import builtins
 import pathlib
-import sys
 
 import unittest
 import mock
-import six
 import tarfile
 
-from docker_squash.squash import Squash
 from docker_squash.image import Image
 from docker_squash.v1_image import V1Image
 from docker_squash.errors import SquashError
@@ -156,7 +154,7 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
 
     def test_generate_json(self):
         image_id = '12323dferwt4awefq23rasf'
-        with mock.patch.object(six.moves.builtins, 'open', mock.mock_open()) as mock_file:
+        with mock.patch.object(builtins, 'open', mock.mock_open()) as mock_file:
             self.squash._generate_repositories_json(
                 'file', image_id, 'name', 'tag')
 
@@ -165,7 +163,7 @@ class TestGenerateRepositoriesJSON(unittest.TestCase):
             self.assertIn(mock.call().write('\n'), mock_file.mock_calls)
 
     def test_handle_empty_image_id(self):
-        with mock.patch.object(six.moves.builtins, 'open', mock.mock_open()) as mock_file:
+        with mock.patch.object(builtins, 'open', mock.mock_open()) as mock_file:
             with self.assertRaises(SquashError) as cm:
                 self.squash._generate_repositories_json(
                     'file', None, 'name', 'tag')

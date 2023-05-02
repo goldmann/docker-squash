@@ -10,15 +10,11 @@ import logging
 import os
 import re
 import shutil
-import six
 import tarfile
 import tempfile
 import threading
 
 from docker_squash.errors import SquashError, SquashUnnecessaryError
-
-if not six.PY3:
-    import docker_squash.lib.xtarfile
 
 
 class Chdir(object):
@@ -549,7 +545,7 @@ class Image(object):
         # but when processing tar content - we see this.
         tar_files = [self._normalize_path(x) for x in tar.getnames()]
 
-        for marker, marker_file in six.iteritems(markers):
+        for marker, marker_file in markers.items():
             actual_file = marker.name.replace('.wh.', '')
             normalized_file = self._normalize_path(actual_file)
 
@@ -597,7 +593,7 @@ class Image(object):
         for layer, hardlinks_in_layer in enumerate(skipped_hard_links):
             # We need to start from 1, that's why we bump it here
             current_layer = layer + 1
-            for member in six.itervalues(hardlinks_in_layer):
+            for member in hardlinks_in_layer.values():
                 normalized_name = self._normalize_path(member.name)
                 normalized_linkname = self._normalize_path(member.linkname)
 
@@ -654,12 +650,12 @@ class Image(object):
         for layer, symlinks_in_layer in enumerate(skipped_sym_links):
             # We need to start from 1, that's why we bump it here
             current_layer = layer + 1
-            for member in six.itervalues(symlinks_in_layer):
+            for member in symlinks_in_layer.values():
 
                 # Handling symlinks. This is similar to hard links with one
                 # difference. Sometimes we do want to have broken symlinks
-                # be addedeither case because these can point to locations
-                # that will become avaialble after adding volumes for example.
+                # be added because these can point to locations
+                # that will become available after adding volumes for example.
                 normalized_name = self._normalize_path(member.name)
                 normalized_linkname = self._normalize_path(member.linkname)
 
@@ -753,7 +749,7 @@ class Image(object):
                     # Iterate over marker files found for this particular
                     # layer and if a file in the squashed layers file corresponding
                     # to the marker file is found, then skip both files
-                    for marker, marker_file in six.iteritems(markers):
+                    for marker, marker_file in markers.items():
                         # We have a opaque directory marker file
                         # https://github.com/opencontainers/image-spec/blob/master/layer.md#opaque-whiteout
                         if marker.name.endswith('.wh..wh..opq'):
@@ -783,7 +779,7 @@ class Image(object):
                             skipped_sym_link_files[normalized_name] = member
                             continue
 
-                        if member in six.iterkeys(skipped_markers):
+                        if member in skipped_markers.keys():
                             self.log.debug(
                                 "Skipping '%s' marker file, at the end of squashing we'll see if it's necessary to add it back" % normalized_name)
                             continue
@@ -839,7 +835,7 @@ class Image(object):
                 squashed_tar, squashed_files, to_skip, skipped_sym_links)
 
             for layer in skipped_files:
-                for member, content in six.itervalues(layer):
+                for member, content in layer.values():
                     self._add_file(member, content, squashed_tar,
                                    squashed_files, added_symlinks)
 

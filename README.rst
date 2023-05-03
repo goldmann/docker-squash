@@ -41,7 +41,7 @@ From PyPi
 
     $ pip install docker-squash
 
-It is supported on Python 3.5 and above.
+It is supported on Python 3.6 and above.
 
 Usage
 -----
@@ -214,4 +214,3 @@ Let's confirm the image structure now:
     6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B
     474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB
     1544084fad81        6 months ago        /bin/sh -c #(nop) MAINTAINER The CentOS Proje   0 B
-

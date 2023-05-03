@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import docker
 import os
+
+import docker
 import requests
 
 from docker_squash.errors import Error
@@ -22,14 +23,18 @@ def docker_client(log):
 
     # Default timeout 10 minutes
     try:
-        timeout = int(os.getenv('DOCKER_TIMEOUT', 600))
-    except ValueError as e:
-        raise Error("Provided timeout value: %s cannot be parsed as integer, exiting." %
-                    os.getenv('DOCKER_TIMEOUT'))
+        timeout = int(os.getenv("DOCKER_TIMEOUT", 600))
+    except ValueError:
+        raise Error(
+            "Provided timeout value: %s cannot be parsed as integer, exiting."
+            % os.getenv("DOCKER_TIMEOUT")
+        )
 
     if not timeout > 0:
         raise Error(
-            "Provided timeout value needs to be greater than zero, currently: %s, exiting." % timeout)
+            "Provided timeout value needs to be greater than zero, currently: %s, exiting."
+            % timeout
+        )
 
     # backwards compat
     try:
@@ -46,7 +51,8 @@ def docker_client(log):
         client = APIClientClass(**params)
     except docker.errors.DockerException as e:
         log.error(
-            "Could not create Docker client, please make sure that you specified valid parameters in the 'DOCKER_HOST' environment variable.")
+            "Could not create Docker client, please make sure that you specified valid parameters in the 'DOCKER_HOST' environment variable."
+        )
         raise Error("Error while creating the Docker client: %s" % e)
 
     if client and valid_docker_connection(client):
@@ -54,11 +60,13 @@ def docker_client(log):
         return client
     else:
         log.error(
-            "Could not connect to the Docker daemon, please make sure the Docker daemon is running.")
+            "Could not connect to the Docker daemon, please make sure the Docker daemon is running."
+        )
 
-        if os.environ.get('DOCKER_HOST'):
+        if os.environ.get("DOCKER_HOST"):
             log.error(
-                "If Docker daemon is running, please make sure that you specified valid parameters in the 'DOCKER_HOST' environment variable.")
+                "If Docker daemon is running, please make sure that you specified valid parameters in the 'DOCKER_HOST' environment variable."
+            )
 
         raise Error("Cannot connect to Docker daemon")
 

@@ -1,32 +1,34 @@
-
 import hashlib
 import json
 import os
 import shutil
-
 from collections import OrderedDict
+
 from docker_squash.image import Image
 
 
 class V2Image(Image):
-    FORMAT = 'v2'
+    FORMAT = "v2"
 
     def _before_squashing(self):
         super(V2Image, self)._before_squashing()
 
         # Read old image manifest file
         self.old_image_manifest = self._read_json_file(
-            os.path.join(self.old_image_dir, "manifest.json"))[0]
+            os.path.join(self.old_image_dir, "manifest.json")
+        )[0]
 
         # Read old image config file
-        self.old_image_config = self._read_json_file(os.path.join(
-            self.old_image_dir, self.old_image_manifest['Config']))
+        self.old_image_config = self._read_json_file(
+            os.path.join(self.old_image_dir, self.old_image_manifest["Config"])
+        )
 
         # Read layer paths inside of the tar archive
         # We split it into layers that needs to be squashed
         # and layers that needs to be moved as-is
         self.layer_paths_to_squash, self.layer_paths_to_move = self._read_layer_paths(
-            self.old_image_config, self.old_image_manifest, self.layers_to_move)
+            self.old_image_config, self.old_image_manifest, self.layers_to_move
+        )
 
         if self.layer_paths_to_move:
             self.squash_id = self.layer_paths_to_move[-1]
@@ -36,8 +38,7 @@ class V2Image(Image):
             # Prepare the directory
             os.makedirs(self.squashed_dir)
             # Merge data layers
-            self._squash_layers(self.layer_paths_to_squash,
-                                self.layer_paths_to_move)
+            self._squash_layers(self.layer_paths_to_squash, self.layer_paths_to_move)
 
         self.diff_ids = self._generate_diff_ids()
         self.chain_ids = self._generate_chain_ids(self.diff_ids)
@@ -53,7 +54,8 @@ class V2Image(Image):
             layer_path_id = self._generate_squashed_layer_path_id()
 
             metadata = self._generate_last_layer_metadata(
-                layer_path_id, self.layer_paths_to_squash[0])
+                layer_path_id, self.layer_paths_to_squash[0]
+            )
             self._write_squashed_layer_metadata(metadata)
 
             # Write version file to the squashed layer
@@ -61,23 +63,32 @@ class V2Image(Image):
             self._write_version_file(self.squashed_dir)
 
             # Move the temporary squashed layer directory to the correct one
-            shutil.move(self.squashed_dir, os.path.join(
-                self.new_image_dir, layer_path_id))
+            shutil.move(
+                self.squashed_dir, os.path.join(self.new_image_dir, layer_path_id)
+            )
 
         manifest = self._generate_manifest_metadata(
-            image_id, self.image_name, self.image_tag, self.old_image_manifest, self.layer_paths_to_move, layer_path_id)
+            image_id,
+            self.image_name,
+            self.image_tag,
+            self.old_image_manifest,
+            self.layer_paths_to_move,
+            layer_path_id,
+        )
 
         self._write_manifest_metadata(manifest)
 
         repository_image_id = manifest[0]["Layers"][-1].split("/")[0]
 
         # Move all the layers that should be untouched
-        self._move_layers(self.layer_paths_to_move,
-                          self.old_image_dir, self.new_image_dir)
+        self._move_layers(
+            self.layer_paths_to_move, self.old_image_dir, self.new_image_dir
+        )
 
         repositories_file = os.path.join(self.new_image_dir, "repositories")
         self._generate_repositories_json(
-            repositories_file, repository_image_id, self.image_name, self.image_tag)
+            repositories_file, repository_image_id, self.image_name, self.image_tag
+        )
 
         return image_id
 
@@ -85,8 +96,7 @@ class V2Image(Image):
         # Create JSON from the metadata
         # Docker adds new line at the end
         json_metadata, image_id = self._dump_json(metadata, True)
-        image_metadata_file = os.path.join(
-            self.new_image_dir, "%s.json" % image_id)
+        image_metadata_file = os.path.join(self.new_image_dir, "%s.json" % image_id)
 
         self._write_json_metadata(json_metadata, image_metadata_file)
 
@@ -104,27 +114,34 @@ class V2Image(Image):
 
         self._write_json_metadata(json_manifest, manifest_file)
 
-    def _generate_manifest_metadata(self, image_id, image_name, image_tag, old_image_manifest, layer_paths_to_move, layer_path_id=None):
+    def _generate_manifest_metadata(
+        self,
+        image_id,
+        image_name,
+        image_tag,
+        old_image_manifest,
+        layer_paths_to_move,
+        layer_path_id=None,
+    ):
         manifest = OrderedDict()
-        manifest['Config'] = "%s.json" % image_id
+        manifest["Config"] = "%s.json" % image_id
 
         if image_name and image_tag:
-            manifest['RepoTags'] = ["%s:%s" % (image_name, image_tag)]
+            manifest["RepoTags"] = ["%s:%s" % (image_name, image_tag)]
 
-        manifest['Layers'] = old_image_manifest[
-            'Layers'][:len(layer_paths_to_move)]
+        manifest["Layers"] = old_image_manifest["Layers"][: len(layer_paths_to_move)]
 
         if layer_path_id:
-            manifest['Layers'].append("%s/layer.tar" % layer_path_id)
+            manifest["Layers"].append("%s/layer.tar" % layer_path_id)
 
         return [manifest]
 
     def _read_json_file(self, json_file):
-        """ Helper function to read JSON file as OrderedDict """
+        """Helper function to read JSON file as OrderedDict"""
 
         self.log.debug("Reading '%s' JSON file..." % json_file)
 
-        with open(json_file, 'r') as f:
+        with open(json_file, "r") as f:
             return json.load(f, object_pairs_hook=OrderedDict)
 
     def _read_layer_paths(self, old_image_config, old_image_manifest, layers_to_move):
@@ -143,14 +160,14 @@ class V2Image(Image):
         layer_paths_to_squash = []
 
         # Iterate over image history, from base image to top layer
-        for i, layer in enumerate(old_image_config['history']):
-
+        for i, layer in enumerate(old_image_config["history"]):
             # If it's not an empty layer get the id
             # (directory name) where the layer's data is
             # stored
-            if not layer.get('empty_layer', False):
-                layer_id = old_image_manifest['Layers'][
-                    current_manifest_layer].rsplit('/')[0]
+            if not layer.get("empty_layer", False):
+                layer_id = old_image_manifest["Layers"][current_manifest_layer].rsplit(
+                    "/"
+                )[0]
 
                 # Check if this layer should be moved or squashed
                 if len(layers_to_move) > i:
@@ -163,7 +180,7 @@ class V2Image(Image):
         return layer_paths_to_squash, layer_paths_to_move
 
     def _generate_chain_id(self, chain_ids, diff_ids, parent_chain_id):
-        if parent_chain_id == None:
+        if parent_chain_id is None:
             return self._generate_chain_id(chain_ids, diff_ids[1:], diff_ids[0])
 
         chain_ids.append(parent_chain_id)
@@ -173,7 +190,7 @@ class V2Image(Image):
 
         # This probably should not be hardcoded
         to_hash = "sha256:%s sha256:%s" % (parent_chain_id, diff_ids[0])
-        digest = hashlib.sha256(str(to_hash).encode('utf8')).hexdigest()
+        digest = hashlib.sha256(str(to_hash).encode("utf8")).hexdigest()
 
         return self._generate_chain_id(chain_ids, diff_ids[1:], digest)
 
@@ -188,7 +205,9 @@ class V2Image(Image):
         diff_ids = []
 
         for path in self.layer_paths_to_move:
-            sha256 = self._compute_sha256(os.path.join(self.old_image_dir, path, "layer.tar"))
+            sha256 = self._compute_sha256(
+                os.path.join(self.old_image_dir, path, "layer.tar")
+            )
             diff_ids.append(sha256)
 
         if self.layer_paths_to_squash:
@@ -200,7 +219,7 @@ class V2Image(Image):
     def _compute_sha256(self, layer_tar):
         sha256 = hashlib.sha256()
 
-        with open(layer_tar, 'rb') as f:
+        with open(layer_tar, "rb") as f:
             while True:
                 # Read in 10MB chunks
                 data = f.read(10485760)
@@ -227,25 +246,25 @@ class V2Image(Image):
         v1_metadata = OrderedDict(self.old_image_config)
 
         # Update image creation date
-        v1_metadata['created'] = self.date
+        v1_metadata["created"] = self.date
 
         # Remove unnecessary elements
         # Do not fail if key is not found
-        for key in 'history', 'rootfs', 'container':
+        for key in "history", "rootfs", "container":
             v1_metadata.pop(key, None)
 
         # Docker internally changes the order of keys between
         # exported metadata (why oh why?!). We need to add 'os'
         # element after 'layer_id'
-        operating_system = v1_metadata.pop('os', None)
+        operating_system = v1_metadata.pop("os", None)
 
         # The 'layer_id' element is the chain_id of the
         # squashed layer
-        v1_metadata['layer_id'] = "sha256:%s" % self.chain_ids[-1]
+        v1_metadata["layer_id"] = "sha256:%s" % self.chain_ids[-1]
 
         # Add back 'os' element
         if operating_system:
-            v1_metadata['os'] = operating_system
+            v1_metadata["os"] = operating_system
 
         # The 'parent' element is the name of the directory (inside the
         # exported tar archive) of the last layer that we move
@@ -257,14 +276,14 @@ class V2Image(Image):
             else:
                 parent = self.layer_paths_to_move[0]
 
-            v1_metadata['parent'] = "sha256:%s" % parent
+            v1_metadata["parent"] = "sha256:%s" % parent
 
         # The 'Image' element is the id of the layer from which we squash
         if self.squash_id:
             # Update image id, should be one layer below squashed layer
-            v1_metadata['config']['Image'] = self.squash_id
+            v1_metadata["config"]["Image"] = self.squash_id
         else:
-            v1_metadata['config']['Image'] = ""
+            v1_metadata["config"]["Image"] = ""
 
         # Get the sha256sum of the JSON exported metadata,
         # we do not care about the metadata anymore
@@ -276,27 +295,26 @@ class V2Image(Image):
         if not old_layer_path:
             old_layer_path = layer_path_id
 
-        config_file = os.path.join(
-            self.old_image_dir, old_layer_path, "json")
+        config_file = os.path.join(self.old_image_dir, old_layer_path, "json")
 
-        with open(config_file, 'r') as f:
+        with open(config_file, "r") as f:
             config = json.load(f, object_pairs_hook=OrderedDict)
 
-        config['created'] = self.date
+        config["created"] = self.date
 
         if self.squash_id:
             # Update image id, should be one layer below squashed layer
-            config['config']['Image'] = self.squash_id
+            config["config"]["Image"] = self.squash_id
         else:
-            config['config']['Image'] = ""
+            config["config"]["Image"] = ""
 
         # Update 'parent' - it should be path to the last layer to move
         if self.layer_paths_to_move:
-            config['parent'] = self.layer_paths_to_move[-1]
+            config["parent"] = self.layer_paths_to_move[-1]
         else:
             config.pop("parent", None)
         # Update 'id' - it should be the path to the layer
-        config['id'] = layer_path_id
+        config["id"] = layer_path_id
         config.pop("container", None)
         return config
 
@@ -305,33 +323,33 @@ class V2Image(Image):
         # generating one from scratch
         metadata = OrderedDict(self.old_image_config)
         # Update image creation date
-        metadata['created'] = self.date
+        metadata["created"] = self.date
 
         # Remove unnecessary or old fields
         metadata.pop("container", None)
 
         # Remove squashed layers from history
-        metadata['history'] = metadata['history'][:len(self.layers_to_move)]
+        metadata["history"] = metadata["history"][: len(self.layers_to_move)]
         # Remove diff_ids for squashed layers
-        metadata['rootfs']['diff_ids'] = metadata['rootfs'][
-            'diff_ids'][:len(self.layer_paths_to_move)]
+        metadata["rootfs"]["diff_ids"] = metadata["rootfs"]["diff_ids"][
+            : len(self.layer_paths_to_move)
+        ]
 
-        history = {'comment': self.comment, 'created': self.date}
+        history = {"comment": self.comment, "created": self.date}
 
         if self.layer_paths_to_squash:
             # Add diff_ids for the squashed layer
-            metadata['rootfs']['diff_ids'].append(
-                "sha256:%s" % self.diff_ids[-1])
+            metadata["rootfs"]["diff_ids"].append("sha256:%s" % self.diff_ids[-1])
         else:
-            history['empty_layer'] = True
+            history["empty_layer"] = True
 
         # Add new entry for squashed layer to history
-        metadata['history'].append(history)
+        metadata["history"].append(history)
 
         if self.squash_id:
             # Update image id, should be one layer below squashed layer
-            metadata['config']['Image'] = self.squash_id
+            metadata["config"]["Image"] = self.squash_id
         else:
-            metadata['config']['Image'] = ""
+            metadata["config"]["Image"] = ""
 
         return metadata

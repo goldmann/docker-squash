@@ -1,26 +1,25 @@
-
 import datetime
-import itertools
-import pathlib
-from typing import List
-
-import docker
 import hashlib
+import itertools
 import json
 import logging
 import os
+import pathlib
 import re
 import shutil
 import tarfile
 import tempfile
 import threading
+from typing import List
+
+import docker
 
 from docker_squash.errors import SquashError, SquashUnnecessaryError
 
 
 class Chdir(object):
 
-    """ Context manager for changing the current working directory """
+    """Context manager for changing the current working directory"""
 
     def __init__(self, newPath):
         self.newPath = os.path.expanduser(newPath)
@@ -44,7 +43,9 @@ class Image(object):
     FORMAT = None
     """ Image format version """
 
-    def __init__(self, log, docker, image, from_layer, tmp_dir=None, tag=None, comment=""):
+    def __init__(
+        self, log, docker, image, from_layer, tmp_dir=None, tag=None, comment=""
+    ):
         self.log = log
         self.debug = self.log.isEnabledFor(logging.DEBUG)
         self.docker = docker
@@ -64,7 +65,8 @@ class Image(object):
         # different metadata. That's why we need to strip all zeros at the
         # end of the date string...
         self.date = re.sub(
-            r'0*Z$', 'Z', datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ'))
+            r"0*Z$", "Z", datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        )
         """ Date used in metadata, already formatted using the `%Y-%m-%dT%H:%M:%S.%fZ` format """
 
         self.tmp_dir = tmp_dir
@@ -81,7 +83,7 @@ class Image(object):
         pass
 
     def cleanup(self):
-        """ Cleanup the temporary directory """
+        """Cleanup the temporary directory"""
 
         self.log.debug("Cleaning up %s temporary directory" % self.tmp_dir)
         shutil.rmtree(self.tmp_dir, ignore_errors=True)
@@ -90,7 +92,7 @@ class Image(object):
         # Prepare temporary directory where all the work will be executed
         try:
             self.tmp_dir = self._prepare_tmp_directory(self.tmp_dir)
-        except:
+        except Exception:
             raise SquashError("Preparing temporary directory failed")
 
         # Temporary location on the disk of the old, unpacked *image*
@@ -106,18 +108,23 @@ class Image(object):
     def _squash_id(self, layer):
         if layer == "<missing>":
             self.log.warning(
-                "You try to squash from layer that does not have it's own ID, we'll try to find it later")
+                "You try to squash from layer that does not have it's own ID, we'll try to find it later"
+            )
             return None
 
         try:
-            squash_id = self.docker.inspect_image(layer)['Id']
-        except:
+            squash_id = self.docker.inspect_image(layer)["Id"]
+        except Exception:
             raise SquashError(
-                "Could not get the layer ID to squash, please check provided 'layer' argument: %s" % layer)
+                "Could not get the layer ID to squash, please check provided 'layer' argument: %s"
+                % layer
+            )
 
         if squash_id not in self.old_image_layers:
             raise SquashError(
-                "Couldn't find the provided layer (%s) in the %s image" % (layer, self.image))
+                "Couldn't find the provided layer (%s) in the %s image"
+                % (layer, self.image)
+            )
 
         self.log.debug("Layer ID to squash from: %s" % squash_id)
 
@@ -132,13 +139,17 @@ class Image(object):
         # Only positive numbers are correct
         if number_of_layers <= 0:
             raise SquashError(
-                "Number of layers to squash cannot be less or equal 0, provided: %s" % number_of_layers)
+                "Number of layers to squash cannot be less or equal 0, provided: %s"
+                % number_of_layers
+            )
 
         # Do not squash if provided number of layer to squash is bigger
         # than number of actual layers in the image
         if number_of_layers > len(self.old_image_layers):
             raise SquashError(
-                "Cannot squash %s layers, the %s image contains only %s layers" % (number_of_layers, self.image, len(self.old_image_layers)))
+                "Cannot squash %s layers, the %s image contains only %s layers"
+                % (number_of_layers, self.image, len(self.old_image_layers))
+            )
 
     def _before_squashing(self):
         self._initialize_directories()
@@ -151,10 +162,12 @@ class Image(object):
 
         # The image id or name of the image to be squashed
         try:
-            self.old_image_id = self.docker.inspect_image(self.image)['Id']
+            self.old_image_id = self.docker.inspect_image(self.image)["Id"]
         except SquashError:
             raise SquashError(
-                "Could not get the image ID to squash, please check provided 'image' argument: %s" % self.image)
+                "Could not get the image ID to squash, please check provided 'image' argument: %s"
+                % self.image
+            )
 
         self.old_image_layers = []
 
@@ -167,14 +180,13 @@ class Image(object):
         self.log.debug("Old layers: %s", self.old_image_layers)
 
         # By default - squash all layers.
-        if self.from_layer == None:
+        if self.from_layer is None:
             self.from_layer = len(self.old_image_layers)
 
         try:
             number_of_layers = int(self.from_layer)
 
-            self.log.debug(
-                "We detected number of layers as the argument to squash")
+            self.log.debug("We detected number of layers as the argument to squash")
         except ValueError:
             self.log.debug("We detected layer as the argument to squash")
 
@@ -182,10 +194,13 @@ class Image(object):
 
             if not squash_id:
                 raise SquashError(
-                    "The %s layer could not be found in the %s image" % (self.from_layer, self.image))
+                    "The %s layer could not be found in the %s image"
+                    % (self.from_layer, self.image)
+                )
 
-            number_of_layers = len(self.old_image_layers) - \
-                self.old_image_layers.index(squash_id) - 1
+            number_of_layers = (
+                len(self.old_image_layers) - self.old_image_layers.index(squash_id) - 1
+            )
 
         self._validate_number_of_layers(number_of_layers)
 
@@ -198,14 +213,15 @@ class Image(object):
 
         if len(self.layers_to_squash) < 1:
             raise SquashError(
-                "Invalid number of layers to squash: %s" % len(self.layers_to_squash))
+                "Invalid number of layers to squash: %s" % len(self.layers_to_squash)
+            )
 
         if len(self.layers_to_squash) == 1:
             raise SquashUnnecessaryError(
-                "Single layer marked to squash, no squashing is required")
+                "Single layer marked to squash, no squashing is required"
+            )
 
-        self.log.info("Attempting to squash last %s layers...",
-                      number_of_layers)
+        self.log.info("Attempting to squash last %s layers...", number_of_layers)
         self.log.debug("Layers to squash: %s", self.layers_to_squash)
         self.log.debug("Layers to move: %s", self.layers_to_move)
 
@@ -222,17 +238,21 @@ class Image(object):
 
         self.size_after = self._dir_size(self.new_image_dir)
 
-        size_before_mb = float(self.size_before)/1024/1024
-        size_after_mb = float(self.size_after)/1024/1024
+        size_before_mb = float(self.size_before) / 1024 / 1024
+        size_after_mb = float(self.size_after) / 1024 / 1024
 
         self.log.info("Original image size: %.2f MB" % size_before_mb)
         self.log.info("Squashed image size: %.2f MB" % size_after_mb)
 
-        if (size_after_mb >= size_before_mb):
-            self.log.info("If the squashed image is larger than original it means that there were no meaningful files to squash and it just added metadata. Are you sure you specified correct parameters?")
+        if size_after_mb >= size_before_mb:
+            self.log.info(
+                "If the squashed image is larger than original it means that there were no meaningful files to squash and it just added metadata. Are you sure you specified correct parameters?"
+            )
         else:
-            self.log.info("Image size decreased by %.2f %%" % float(
-                ((size_before_mb-size_after_mb)/size_before_mb)*100))
+            self.log.info(
+                "Image size decreased by %.2f %%"
+                % float(((size_before_mb - size_after_mb) / size_before_mb) * 100)
+            )
 
     def _dir_size(self, directory):
         size = 0
@@ -257,8 +277,10 @@ class Image(object):
         self._load_image(self.new_image_dir)
 
         if self.tag:
-            self.log.info("Image registered in Docker daemon as %s:%s" %
-                          (self.image_name, self.image_tag))
+            self.log.info(
+                "Image registered in Docker daemon as %s:%s"
+                % (self.image_name, self.image_tag)
+            )
 
     def _files_in_layers(self, layers, directory):
         """
@@ -269,20 +291,21 @@ class Image(object):
         for layer in layers:
             self.log.debug("Generating list of files in layer '%s'..." % layer)
             tar_file = os.path.join(directory, layer, "layer.tar")
-            with tarfile.open(tar_file, 'r', format=tarfile.PAX_FORMAT) as tar:
-                files[layer] = [self._normalize_path(
-                    x) for x in tar.getnames()]
+            with tarfile.open(tar_file, "r", format=tarfile.PAX_FORMAT) as tar:
+                files[layer] = [self._normalize_path(x) for x in tar.getnames()]
             self.log.debug("Done, found %s files" % len(files[layer]))
 
         return files
 
     def _prepare_tmp_directory(self, tmp_dir):
-        """ Creates temporary directory that is used to work on layers """
+        """Creates temporary directory that is used to work on layers"""
 
         if tmp_dir:
             if os.path.exists(tmp_dir):
                 raise SquashError(
-                    "The '%s' directory already exists, please remove it before you proceed" % tmp_dir)
+                    "The '%s' directory already exists, please remove it before you proceed"
+                    % tmp_dir
+                )
             os.makedirs(tmp_dir)
         else:
             tmp_dir = tempfile.mkdtemp(prefix="docker-squash-")
@@ -292,12 +315,11 @@ class Image(object):
         return tmp_dir
 
     def _load_image(self, directory):
-
         tar_file = os.path.join(self.tmp_dir, "image.tar")
 
         self._tar_image(tar_file, directory)
 
-        with open(tar_file, 'rb') as f:
+        with open(tar_file, "rb") as f:
             self.log.debug("Loading squashed image...")
             self.docker.load_image(f)
             self.log.debug("Image loaded!")
@@ -305,7 +327,7 @@ class Image(object):
         os.remove(tar_file)
 
     def _tar_image(self, target_tar_file, directory):
-        with tarfile.open(target_tar_file, 'w', format=tarfile.PAX_FORMAT) as tar:
+        with tarfile.open(target_tar_file, "w", format=tarfile.PAX_FORMAT) as tar:
             self.log.debug("Generating tar archive for the squashed image...")
             with Chdir(directory):
                 # docker produces images like this:
@@ -320,19 +342,19 @@ class Image(object):
             self.log.debug("Archive generated")
 
     def _layers_to_squash(self, layers, from_layer):
-        """ Prepares a list of layer IDs that should be squashed """
+        """Prepares a list of layer IDs that should be squashed"""
         to_squash = []
         to_leave = []
         should_squash = True
 
-        for l in reversed(layers):
-            if l == from_layer:
+        for reversed_layer in reversed(layers):
+            if reversed_layer == from_layer:
                 should_squash = False
 
             if should_squash:
-                to_squash.append(l)
+                to_squash.append(reversed_layer)
             else:
-                to_leave.append(l)
+                to_leave.append(reversed_layer)
 
         to_squash.reverse()
         to_leave.reverse()
@@ -340,38 +362,38 @@ class Image(object):
         return to_squash, to_leave
 
     def _extract_tar(self, fileobj, directory):
-        with tarfile.open(fileobj=fileobj, mode='r|') as tar:
+        with tarfile.open(fileobj=fileobj, mode="r|") as tar:
             tar.extractall(path=directory)
 
     def _save_image(self, image_id, directory):
-        """ Saves the image as a tar archive under specified name """
+        """Saves the image as a tar archive under specified name"""
 
         for x in [0, 1, 2]:
-            self.log.info("Saving image %s to %s directory..." %
-                          (image_id, directory))
+            self.log.info("Saving image %s to %s directory..." % (image_id, directory))
             self.log.debug("Try #%s..." % (x + 1))
 
             try:
                 image = self.docker.get_image(image_id)
 
-                if int(docker.__version__.split('.')[0]) < 3:
+                if int(docker.__version__.split(".")[0]) < 3:
                     # Docker library prior to 3.0.0 returned the requests
                     # object directly which cold be used to read from
                     self.log.debug(
-                        "Extracting image using HTTPResponse object directly")
+                        "Extracting image using HTTPResponse object directly"
+                    )
                     self._extract_tar(image, directory)
                 else:
                     # Docker library >=3.0.0 returns iterator over raw data
-                    self.log.debug(
-                        "Extracting image using iterator over raw data")
+                    self.log.debug("Extracting image using iterator over raw data")
 
                     fd_r, fd_w = os.pipe()
 
-                    r = os.fdopen(fd_r, 'rb')
-                    w = os.fdopen(fd_w, 'wb')
+                    r = os.fdopen(fd_r, "rb")
+                    w = os.fdopen(fd_w, "wb")
 
                     extracter = threading.Thread(
-                        target=self._extract_tar, args=(r, directory))
+                        target=self._extract_tar, args=(r, directory)
+                    )
                     extracter.start()
 
                     for chunk in image:
@@ -387,26 +409,26 @@ class Image(object):
             except Exception as e:
                 self.log.exception(e)
                 self.log.warning(
-                    "An error occured while saving the %s image, retrying..." % image_id)
+                    "An error occured while saving the %s image, retrying..." % image_id
+                )
 
         raise SquashError("Couldn't save %s image!" % image_id)
 
     def _unpack(self, tar_file, directory):
-        """ Unpacks tar archive to selected directory """
+        """Unpacks tar archive to selected directory"""
 
-        self.log.info("Unpacking %s tar file to %s directory" %
-                      (tar_file, directory))
+        self.log.info("Unpacking %s tar file to %s directory" % (tar_file, directory))
 
-        with tarfile.open(tar_file, 'r') as tar:
+        with tarfile.open(tar_file, "r") as tar:
             tar.extractall(path=directory)
 
         self.log.info("Archive unpacked!")
 
     def _read_layers(self, layers, image_id):
-        """ Reads the JSON metadata for specified layer / image id """
+        """Reads the JSON metadata for specified layer / image id"""
 
         for layer in self.docker.history(image_id):
-            layers.append(layer['Id'])
+            layers.append(layer["Id"])
 
     def _parse_image_name(self, image):
         """
@@ -414,9 +436,9 @@ class Image(object):
         name and tag part, if possible. If no tag is provided
         'latest' is used.
         """
-        if ':' in image and '/' not in image.split(':')[-1]:
-            image_tag = image.split(':')[-1]
-            image_name = image[:-(len(image_tag) + 1)]
+        if ":" in image and "/" not in image.split(":")[-1]:
+            image_tag = image.split(":")[-1]
+            image_name = image[: -(len(image_tag) + 1)]
         else:
             image_tag = "latest"
             image_name = image
@@ -430,13 +452,13 @@ class Image(object):
         """
 
         # We do not want any spaces between keys and values in JSON
-        json_data = json.dumps(data, separators=(',', ':'))
+        json_data = json.dumps(data, separators=(",", ":"))
 
         if new_line:
             json_data = "%s\n" % json_data
 
         # Generate sha256sum of the JSON data, may be handy
-        sha = hashlib.sha256(json_data.encode('utf-8')).hexdigest()
+        sha = hashlib.sha256(json_data.encode("utf-8")).hexdigest()
 
         return json_data, sha
 
@@ -444,36 +466,37 @@ class Image(object):
         if not image_id:
             raise SquashError("Provided image id cannot be null")
 
-        if name == tag == None:
+        if name is None and tag is None:
             self.log.debug(
-                "No name and tag provided for the image, skipping generating repositories file")
+                "No name and tag provided for the image, skipping generating repositories file"
+            )
             return
 
         repos = {}
         repos[name] = {}
         repos[name][tag] = image_id
 
-        data = json.dumps(repos, separators=(',', ':'))
+        data = json.dumps(repos, separators=(",", ":"))
 
-        with open(repositories_file, 'w') as f:
+        with open(repositories_file, "w") as f:
             f.write(data)
             f.write("\n")
 
     def _write_version_file(self, squashed_dir):
         version_file = os.path.join(squashed_dir, "VERSION")
 
-        with open(version_file, 'w') as f:
+        with open(version_file, "w") as f:
             f.write("1.0")
 
     def _write_json_metadata(self, metadata, metadata_file):
-        with open(metadata_file, 'w') as f:
+        with open(metadata_file, "w") as f:
             f.write(metadata)
 
     def _read_old_metadata(self, old_json_file):
         self.log.debug("Reading JSON metadata file '%s'..." % old_json_file)
 
         # Read original metadata
-        with open(old_json_file, 'r') as f:
+        with open(old_json_file, "r") as f:
             metadata = json.load(f)
 
         return metadata
@@ -485,7 +508,7 @@ class Image(object):
         moved from the old image to the new image untouched.
         """
         for layer in layers:
-            layer_id = layer.replace('sha256:', '')
+            layer_id = layer.replace("sha256:", "")
 
             self.log.debug("Moving unmodified layer '%s'..." % layer_id)
             shutil.move(os.path.join(src, layer_id), dest)
@@ -514,11 +537,10 @@ class Image(object):
         """
         marker_files = {}
 
-        self.log.debug(
-            "Searching for marker files in '%s' archive..." % tar.name)
+        self.log.debug("Searching for marker files in '%s' archive..." % tar.name)
 
         for member in members:
-            if '.wh.' in member.name:
+            if ".wh." in member.name:
                 self.log.debug("Found '%s' marker file" % member.name)
                 marker_files[member] = tar.extractfile(member)
 
@@ -534,8 +556,7 @@ class Image(object):
         """
 
         if markers:
-            self.log.debug("Marker files to add: %s" %
-                           [o.name for o in markers.keys()])
+            self.log.debug("Marker files to add: %s" % [o.name for o in markers.keys()])
         else:
             # No marker files to add
             return
@@ -547,19 +568,23 @@ class Image(object):
         tar_files = [self._normalize_path(x) for x in tar.getnames()]
 
         for marker, marker_file in markers.items():
-            actual_file = marker.name.replace('.wh.', '')
+            actual_file = marker.name.replace(".wh.", "")
             normalized_file = self._normalize_path(actual_file)
 
             should_be_added_back = False
 
             if self._file_should_be_skipped(normalized_file, added_symlinks):
                 self.log.debug(
-                    "Skipping '%s' marker file, this file is on a symlink path" % normalized_file)
+                    "Skipping '%s' marker file, this file is on a symlink path"
+                    % normalized_file
+                )
                 continue
 
             if normalized_file in tar_files:
                 self.log.debug(
-                    "Skipping '%s' marker file, this file was added earlier for some reason..." % normalized_file)
+                    "Skipping '%s' marker file, this file was added earlier for some reason..."
+                    % normalized_file
+                )
                 continue
 
             if files_in_layers:
@@ -574,8 +599,7 @@ class Image(object):
                 should_be_added_back = True
 
             if should_be_added_back:
-                self.log.debug(
-                    "Adding '%s' marker file back..." % marker.name)
+                self.log.debug("Adding '%s' marker file back..." % marker.name)
                 # Marker files on AUFS are hardlinks, we need to create
                 # regular files, therefore we need to recreate the tarinfo
                 # object
@@ -584,8 +608,7 @@ class Image(object):
                 # in tar archive
                 tar_files.append(normalized_file)
             else:
-                self.log.debug(
-                    "Skipping '%s' marker file..." % marker.name)
+                self.log.debug("Skipping '%s' marker file..." % marker.name)
 
     def _normalize_path(self, path):
         return os.path.normpath(os.path.join("/", path))
@@ -600,11 +623,11 @@ class Image(object):
 
                 # Find out if the name is on the list of files to skip - if it is - get the layer number
                 # where it was found
-                layer_skip_name = self._file_should_be_skipped(
-                    normalized_name, to_skip)
+                layer_skip_name = self._file_should_be_skipped(normalized_name, to_skip)
                 # Do the same for linkname
                 layer_skip_linkname = self._file_should_be_skipped(
-                    normalized_linkname, to_skip)
+                    normalized_linkname, to_skip
+                )
 
                 # We need to check if we should skip adding back the hard link
                 # This can happen in the following situations:
@@ -612,13 +635,24 @@ class Image(object):
                 # 2. hard link target is on the list of files to skip
                 # 3. hard link is already in squashed files
                 # 4. hard link target is NOT in already squashed files
-                if layer_skip_name and current_layer > layer_skip_name or layer_skip_linkname and current_layer > layer_skip_linkname or normalized_name in squashed_files or normalized_linkname not in squashed_files:
-                    self.log.debug("Found a hard link '%s' to a file which is marked to be skipped: '%s', skipping link too" % (
-                        normalized_name, normalized_linkname))
+                if (
+                    layer_skip_name
+                    and current_layer > layer_skip_name
+                    or layer_skip_linkname
+                    and current_layer > layer_skip_linkname
+                    or normalized_name in squashed_files
+                    or normalized_linkname not in squashed_files
+                ):
+                    self.log.debug(
+                        "Found a hard link '%s' to a file which is marked to be skipped: '%s', skipping link too"
+                        % (normalized_name, normalized_linkname)
+                    )
                 else:
                     if self.debug:
-                        self.log.debug("Adding hard link '%s' pointing to '%s' back..." % (
-                            normalized_name, normalized_linkname))
+                        self.log.debug(
+                            "Adding hard link '%s' pointing to '%s' back..."
+                            % (normalized_name, normalized_linkname)
+                        )
 
                     squashed_files.append(normalized_name)
                     squashed_tar.addfile(member)
@@ -628,12 +662,15 @@ class Image(object):
 
         if normalized_name in squashed_files:
             self.log.debug(
-                "Skipping file '%s' because it is already squashed" % normalized_name)
+                "Skipping file '%s' because it is already squashed" % normalized_name
+            )
             return
 
         if self._file_should_be_skipped(normalized_name, to_skip):
             self.log.debug(
-                "Skipping '%s' file because it's on the list to skip files" % normalized_name)
+                "Skipping '%s' file because it's on the list to skip files"
+                % normalized_name
+            )
             return
 
         if content:
@@ -652,7 +689,6 @@ class Image(object):
             # We need to start from 1, that's why we bump it here
             current_layer = layer + 1
             for member in symlinks_in_layer.values():
-
                 # Handling symlinks. This is similar to hard links with one
                 # difference. Sometimes we do want to have broken symlinks
                 # be added because these can point to locations
@@ -663,30 +699,43 @@ class Image(object):
                 # File is already in squashed files, skipping
                 if normalized_name in squashed_files:
                     self.log.debug(
-                        "Found a symbolic link '%s' which is already squashed, skipping" % (normalized_name))
+                        "Found a symbolic link '%s' which is already squashed, skipping"
+                        % (normalized_name)
+                    )
                     continue
 
                 if self._file_should_be_skipped(normalized_name, added_symlinks):
                     self.log.debug(
-                        "Found a symbolic link '%s' which is on a path to previously squashed symlink, skipping" % (normalized_name))
+                        "Found a symbolic link '%s' which is on a path to previously squashed symlink, skipping"
+                        % (normalized_name)
+                    )
                     continue
                 # Find out if the name is on the list of files to skip - if it is - get the layer number
                 # where it was found
-                layer_skip_name = self._file_should_be_skipped(
-                    normalized_name, to_skip)
+                layer_skip_name = self._file_should_be_skipped(normalized_name, to_skip)
                 # Do the same for linkname
                 layer_skip_linkname = self._file_should_be_skipped(
-                    normalized_linkname, to_skip)
+                    normalized_linkname, to_skip
+                )
 
                 # If name or linkname was found in the lists of files to be
                 # skipped or it's not found in the squashed files
-                if layer_skip_name and current_layer > layer_skip_name or layer_skip_linkname and current_layer > layer_skip_linkname:
-                    self.log.debug("Found a symbolic link '%s' to a file which is marked to be skipped: '%s', skipping link too" % (
-                        normalized_name, normalized_linkname))
+                if (
+                    layer_skip_name
+                    and current_layer > layer_skip_name
+                    or layer_skip_linkname
+                    and current_layer > layer_skip_linkname
+                ):
+                    self.log.debug(
+                        "Found a symbolic link '%s' to a file which is marked to be skipped: '%s', skipping link too"
+                        % (normalized_name, normalized_linkname)
+                    )
                 else:
                     if self.debug:
-                        self.log.debug("Adding symbolic link '%s' pointing to '%s' back..." % (
-                            normalized_name, normalized_linkname))
+                        self.log.debug(
+                            "Adding symbolic link '%s' pointing to '%s' back..."
+                            % (normalized_name, normalized_linkname)
+                        )
 
                     added_symlinks.append([normalized_name])
 
@@ -704,9 +753,12 @@ class Image(object):
 
         # Find all files in layers that we don't squash
         files_in_layers_to_move = self._files_in_layers(
-            layers_to_move, self.old_image_dir)
+            layers_to_move, self.old_image_dir
+        )
 
-        with tarfile.open(self.squashed_tar, 'w', format=tarfile.PAX_FORMAT) as squashed_tar:
+        with tarfile.open(
+            self.squashed_tar, "w", format=tarfile.PAX_FORMAT
+        ) as squashed_tar:
             to_skip = []
             skipped_markers = {}
             skipped_hard_links = []
@@ -719,13 +771,14 @@ class Image(object):
             reading_layers: List[tarfile.TarFile] = []
 
             for layer_id in layers_to_squash:
-                layer_tar_file = os.path.join(
-                    self.old_image_dir, layer_id, "layer.tar")
+                layer_tar_file = os.path.join(self.old_image_dir, layer_id, "layer.tar")
 
                 self.log.info("Squashing file '%s'..." % layer_tar_file)
 
                 # Open the exiting layer to squash
-                layer_tar: tarfile.TarFile = tarfile.open(layer_tar_file, 'r', format=tarfile.PAX_FORMAT)
+                layer_tar: tarfile.TarFile = tarfile.open(
+                    layer_tar_file, "r", format=tarfile.PAX_FORMAT
+                )
                 reading_layers.append(layer_tar)
                 # Find all marker files for all layers
                 # We need the list of marker files upfront, so we can
@@ -755,17 +808,16 @@ class Image(object):
                 for marker, marker_file in markers.items():
                     # We have a opaque directory marker file
                     # https://github.com/opencontainers/image-spec/blob/master/layer.md#opaque-whiteout
-                    if marker.name.endswith('.wh..wh..opq'):
+                    if marker.name.endswith(".wh..wh..opq"):
                         opaque_dir = os.path.dirname(marker.name)
 
-                        self.log.debug(
-                            "Found opaque directory: '%s'" % opaque_dir)
+                        self.log.debug("Found opaque directory: '%s'" % opaque_dir)
 
                         layer_opaque_dirs.append(opaque_dir)
                     else:
                         files_to_skip.append(
-                            self._normalize_path(marker.name.replace('.wh.', '')))
-
+                            self._normalize_path(marker.name.replace(".wh.", ""))
+                        )
                         skipped_markers[marker] = marker_file
 
                 # Copy all the files to the new tar
@@ -774,7 +826,9 @@ class Image(object):
 
                     if self._is_in_opaque_dir(member, opaque_dirs):
                         self.log.debug(
-                            "Skipping file '%s' because it is in an opaque directory" % normalized_name)
+                            "Skipping file '%s' because it is in an opaque directory"
+                            % normalized_name
+                        )
                         continue
 
                     # Skip all symlinks, we'll investigate them later
@@ -784,12 +838,16 @@ class Image(object):
 
                     if member in skipped_markers.keys():
                         self.log.debug(
-                            "Skipping '%s' marker file, at the end of squashing we'll see if it's necessary to add it back" % normalized_name)
+                            "Skipping '%s' marker file, at the end of squashing we'll see if it's necessary to add it back"
+                            % normalized_name
+                        )
                         continue
 
                     if self._file_should_be_skipped(normalized_name, skipped_sym_links):
                         self.log.debug(
-                            "Skipping '%s' file because it's on a symlink path, at the end of squashing we'll see if it's necessary to add it back" % normalized_name)
+                            "Skipping '%s' file because it's on a symlink path, at the end of squashing we'll see if it's necessary to add it back"
+                            % normalized_name
+                        )
 
                         if member.isfile():
                             f = (member, layer_tar.extractfile(member))
@@ -802,7 +860,9 @@ class Image(object):
                     # Skip files that are marked to be skipped
                     if self._file_should_be_skipped(normalized_name, to_skip):
                         self.log.debug(
-                            "Skipping '%s' file because it's on the list to skip files" % normalized_name)
+                            "Skipping '%s' file because it's on the list to skip files"
+                            % normalized_name
+                        )
                         continue
 
                     # Check if file is already added to the archive
@@ -812,7 +872,9 @@ class Image(object):
                         # This is true because we do reverse squashing - from
                         # newer to older layer
                         self.log.debug(
-                            "Skipping '%s' file because it's older than file already added to the archive" % normalized_name)
+                            "Skipping '%s' file because it's older than file already added to the archive"
+                            % normalized_name
+                        )
                         continue
 
                     # Hard links are processed after everything else
@@ -825,28 +887,36 @@ class Image(object):
                     if member.isfile():
                         content = layer_tar.extractfile(member)
 
-                    self._add_file(member, content,
-                                   squashed_tar, squashed_files, to_skip)
+                    self._add_file(
+                        member, content, squashed_tar, squashed_files, to_skip
+                    )
 
                 skipped_hard_links.append(skipped_hard_link_files)
                 skipped_files.append(skipped_files_in_layer)
                 opaque_dirs += layer_opaque_dirs
 
-            self._add_hardlinks(squashed_tar, squashed_files,
-                                to_skip, skipped_hard_links)
+            self._add_hardlinks(
+                squashed_tar, squashed_files, to_skip, skipped_hard_links
+            )
             added_symlinks = self._add_symlinks(
-                squashed_tar, squashed_files, to_skip, skipped_sym_links)
+                squashed_tar, squashed_files, to_skip, skipped_sym_links
+            )
 
             for layer in skipped_files:
                 for member, content in layer.values():
-                    self._add_file(member, content, squashed_tar,
-                                   squashed_files, added_symlinks)
+                    self._add_file(
+                        member, content, squashed_tar, squashed_files, added_symlinks
+                    )
 
             if files_in_layers_to_move:
                 self._reduce(skipped_markers)
 
-                self._add_markers(skipped_markers, squashed_tar,
-                                  files_in_layers_to_move, added_symlinks)
+                self._add_markers(
+                    skipped_markers,
+                    squashed_tar,
+                    files_in_layers_to_move,
+                    added_symlinks,
+                )
 
             tar: tarfile.TarFile
             for tar in reading_layers:
@@ -863,8 +933,10 @@ class Image(object):
 
         for opaque_dir in dirs:
             if member.name == opaque_dir or member.name.startswith("%s/" % opaque_dir):
-                self.log.debug("Member '%s' found to be part of opaque directory '%s'" % (
-                    member.name, opaque_dir))
+                self.log.debug(
+                    "Member '%s' found to be part of opaque directory '%s'"
+                    % (member.name, opaque_dir)
+                )
                 return True
 
         return False
@@ -894,24 +966,30 @@ class Image(object):
 
         # Prepare a list of files (or directories) based on the marker
         # files scheduled to be added
-        marked_files = list(map(lambda x: self._normalize_path(
-            x.name.replace('.wh.', '')), markers.keys()))
+        marked_files = list(
+            map(
+                lambda x: self._normalize_path(x.name.replace(".wh.", "")),
+                markers.keys(),
+            )
+        )
 
         # List of markers that should be not added back to tar file
         to_remove = []
 
         for marker in markers.keys():
-            self.log.debug(
-                "Investigating '{}' marker file".format(marker.name))
+            self.log.debug("Investigating '{}' marker file".format(marker.name))
 
-            path = self._normalize_path(marker.name.replace('.wh.', ''))
+            path = self._normalize_path(marker.name.replace(".wh.", ""))
             # Iterate over the path hierarchy, but starting with the
             # root directory. This will make it possible to remove
             # marker files based on the highest possible directory level
             for directory in self._path_hierarchy(path):
                 if directory in marked_files:
                     self.log.debug(
-                        "Marker file '{}' is superseded by higher-level marker file: '{}'".format(marker.name, directory))
+                        "Marker file '{}' is superseded by higher-level marker file: '{}'".format(
+                            marker.name, directory
+                        )
+                    )
                     to_remove.append(marker)
                     break
 
@@ -948,4 +1026,6 @@ class Image(object):
         if len(path.parts) == 1:
             return path.parts
 
-        return itertools.accumulate(path.parts[:-1], func=lambda head, tail: str(path.__class__(head, tail)))
+        return itertools.accumulate(
+            path.parts[:-1], func=lambda head, tail: str(path.__class__(head, tail))
+        )

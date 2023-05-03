@@ -14,7 +14,6 @@ twine = "*"
 isort = "*"
 black = "*"
 flake8 = ">3.6.0"
-docker-squash = {editable = true, path = "."}
 
 [requires]
 python_version = "*"

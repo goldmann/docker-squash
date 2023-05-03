@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """run_formatter.py - A tool to run the various formatters with the project settings"""
+import argparse
 import sys
 from pathlib import Path
 from subprocess import CalledProcessError, run
 
-import argparse
-
 from docker_squash.image import Chdir
 
 
-
-def main(check: bool=False, verbose: bool=False) -> None:
+def main(check: bool = False, verbose: bool = False) -> None:
     """Main function
 
     :params check: Flag to return the status without overwriting any file.
@@ -18,10 +16,16 @@ def main(check: bool=False, verbose: bool=False) -> None:
     options = []
     verbose_opt = []
 
-    parser = argparse.ArgumentParser(prog='Formatter')
-    parser.add_argument('--check', required=False, action='store_true', help="Don't write the files back, just return the status.")
+    parser = argparse.ArgumentParser(prog="Formatter")
     parser.add_argument(
-            '-v', '--verbose', required=False, action='store_true', help='Verbose output')
+        "--check",
+        required=False,
+        action="store_true",
+        help="Don't write the files back, just return the status.",
+    )
+    parser.add_argument(
+        "-v", "--verbose", required=False, action="store_true", help="Verbose output"
+    )
 
     args = parser.parse_args()
 

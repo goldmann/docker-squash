@@ -1,10 +1,10 @@
 *.pyc
-*.tar
-*.xml
 *.swp
-*.tox
+.tox
 .cache
-dist
-*egg-info
+*.egg-info
 target
 .coverage
+.idea
+.venv
+docker-squash.iml

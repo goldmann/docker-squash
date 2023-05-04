@@ -78,6 +78,8 @@ Usage
                             If not provided, image will be loaded into Docker
                             daemon
 
+Note that environment variables may be set as documented in `here <docs/environment_variables.adoc>`_.
+
 License
 -------
 

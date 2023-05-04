@@ -23,6 +23,17 @@ class SingleLevelFilter(logging.Filter):
 
 
 class MyParser(argparse.ArgumentParser):
+    # noinspection PyMethodMayBeStatic
+    def str2bool(self, v: str) -> bool:
+        if isinstance(v, bool):
+            return v
+        if v.lower() in ("yes", "true", "t", "y", "1"):
+            return True
+        elif v.lower() in ("no", "false", "f", "n", "0"):
+            return False
+        else:
+            raise argparse.ArgumentTypeError("Boolean value expected.")
+
     def error(self, message):
         self.print_help()
         sys.stderr.write("\nError: %s\n" % message)
@@ -92,7 +103,15 @@ class CLI(object):
         )
         parser.add_argument(
             "--output-path",
-            help="Path where the image should be stored after squashing. If not provided, image will be loaded into Docker daemon",
+            help="Path where the image may be stored after squashing.",
+        )
+        parser.add_argument(
+            "--load-image",
+            type=parser.str2bool,
+            const=True,
+            nargs="?",
+            default=True,
+            help="Whether to load the image into Docker daemon after squashing",
         )
 
         args = parser.parse_args()
@@ -103,7 +122,6 @@ class CLI(object):
             self.log.setLevel(logging.INFO)
 
         self.log.debug("Running version %s", version)
-
         try:
             squash.Squash(
                 log=self.log,
@@ -112,6 +130,7 @@ class CLI(object):
                 tag=args.tag,
                 comment=args.message,
                 output_path=args.output_path,
+                load_image=args.load_image,
                 tmp_dir=args.tmp_dir,
                 development=args.development,
                 cleanup=args.cleanup,

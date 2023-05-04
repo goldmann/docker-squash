@@ -67,16 +67,16 @@ Usage
                             Number of layers to squash or ID of the layer (or image ID or image name) to squash from.
                             In case the provided value is an integer, specified number of layers will be squashed.
                             Every layer in the image will be squashed if the parameter is not provided.
-      -t TAG, --tag TAG     Specify the tag to be used for the new image. If not
-                            specified no tag will be applied
+      -t TAG, --tag TAG     Specify the tag to be used for the new image. If not specified no tag will be applied
       -m MESSAGE, --message MESSAGE
                             Specify a commit message (comment) for the new image.
       -c, --cleanup         Remove source image from Docker after squashing
       --tmp-dir TMP_DIR     Temporary directory to be created and used
       --output-path OUTPUT_PATH
-                            Path where the image should be stored after squashing.
-                            If not provided, image will be loaded into Docker
-                            daemon
+                            Path where the image may be stored after squashing.
+      --load-image [LOAD_IMAGE]
+                            Whether to load the image into Docker daemon after squashing
+                            Default: true
 
 Note that environment variables may be set as documented in `here <docs/environment_variables.adoc>`_.
 

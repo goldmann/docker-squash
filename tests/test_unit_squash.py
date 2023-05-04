@@ -12,7 +12,7 @@ class TestSquash(unittest.TestCase):
         self.log = mock.Mock()
         self.docker_client = mock.Mock()
         self.docker_client.version.return_value = {
-            "GitCommit": "commit/9.9.9",
+            "Version": "20.10.23",
             "ApiVersion": "9.99",
         }
 

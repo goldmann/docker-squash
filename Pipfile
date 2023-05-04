@@ -11,6 +11,9 @@ pytest = "*"
 pytest-cov = "*"
 mock = "*"
 twine = "*"
+isort = "*"
+black = "*"
+flake8 = ">3.6.0"
 
 [requires]
 python_version = "*"

@@ -1066,6 +1066,16 @@ class TestIntegSquash(IntegSquash):
                 squashed_image.assertFileExists('a/b/c/foo')
                 squashed_image.assertFileDoesNotExist('a/b/c/bar')
 
+    def test_without_io_failure(self):
+        dockerfile = '''
+        FROM  docker.elastic.co/elasticsearch/elasticsearch:7.14.2
+        RUN rm -rf /usr/share/elasticsearch/jdk/*
+        '''
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, None):
+                pass
+
 
 class NumericValues(IntegSquash):
     @classmethod

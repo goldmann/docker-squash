@@ -2,6 +2,7 @@
 import datetime
 import itertools
 import pathlib
+from typing import List
 
 import docker
 import hashlib
@@ -715,6 +716,7 @@ class Image(object):
             squashed_files = []
             # List of opaque directories in the image
             opaque_dirs = []
+            reading_layers: List[tarfile.TarFile] = []
 
             for layer_id in layers_to_squash:
                 layer_tar_file = os.path.join(
@@ -723,111 +725,112 @@ class Image(object):
                 self.log.info("Squashing file '%s'..." % layer_tar_file)
 
                 # Open the exiting layer to squash
-                with tarfile.open(layer_tar_file, 'r', format=tarfile.PAX_FORMAT) as layer_tar:
-                    # Find all marker files for all layers
-                    # We need the list of marker files upfront, so we can
-                    # skip unnecessary files
-                    members = layer_tar.getmembers()
-                    markers = self._marker_files(layer_tar, members)
+                layer_tar: tarfile.TarFile = tarfile.open(layer_tar_file, 'r', format=tarfile.PAX_FORMAT)
+                reading_layers.append(layer_tar)
+                # Find all marker files for all layers
+                # We need the list of marker files upfront, so we can
+                # skip unnecessary files
+                members = layer_tar.getmembers()
+                markers = self._marker_files(layer_tar, members)
 
-                    skipped_sym_link_files = {}
-                    skipped_hard_link_files = {}
-                    skipped_files_in_layer = {}
+                skipped_sym_link_files = {}
+                skipped_hard_link_files = {}
+                skipped_files_in_layer = {}
 
-                    files_to_skip = []
-                    # List of opaque directories found in this layer
-                    layer_opaque_dirs = []
+                files_to_skip = []
+                # List of opaque directories found in this layer
+                layer_opaque_dirs = []
 
-                    # Add it as early as possible, we will be populating
-                    # 'skipped_sym_link_files' array later
-                    skipped_sym_links.append(skipped_sym_link_files)
+                # Add it as early as possible, we will be populating
+                # 'skipped_sym_link_files' array later
+                skipped_sym_links.append(skipped_sym_link_files)
 
-                    # Add it as early as possible, we will be populating
-                    # 'files_to_skip' array later
-                    to_skip.append(files_to_skip)
+                # Add it as early as possible, we will be populating
+                # 'files_to_skip' array later
+                to_skip.append(files_to_skip)
 
-                    # Iterate over marker files found for this particular
-                    # layer and if a file in the squashed layers file corresponding
-                    # to the marker file is found, then skip both files
-                    for marker, marker_file in markers.items():
-                        # We have a opaque directory marker file
-                        # https://github.com/opencontainers/image-spec/blob/master/layer.md#opaque-whiteout
-                        if marker.name.endswith('.wh..wh..opq'):
-                            opaque_dir = os.path.dirname(marker.name)
+                # Iterate over marker files found for this particular
+                # layer and if a file in the squashed layers file corresponding
+                # to the marker file is found, then skip both files
+                for marker, marker_file in markers.items():
+                    # We have a opaque directory marker file
+                    # https://github.com/opencontainers/image-spec/blob/master/layer.md#opaque-whiteout
+                    if marker.name.endswith('.wh..wh..opq'):
+                        opaque_dir = os.path.dirname(marker.name)
 
-                            self.log.debug(
-                                "Found opaque directory: '%s'" % opaque_dir)
+                        self.log.debug(
+                            "Found opaque directory: '%s'" % opaque_dir)
 
-                            layer_opaque_dirs.append(opaque_dir)
-                        else:
-                            files_to_skip.append(
-                                self._normalize_path(marker.name.replace('.wh.', '')))
+                        layer_opaque_dirs.append(opaque_dir)
+                    else:
+                        files_to_skip.append(
+                            self._normalize_path(marker.name.replace('.wh.', '')))
 
-                            skipped_markers[marker] = marker_file
+                        skipped_markers[marker] = marker_file
 
-                    # Copy all the files to the new tar
-                    for member in members:
-                        normalized_name = self._normalize_path(member.name)
+                # Copy all the files to the new tar
+                for member in members:
+                    normalized_name = self._normalize_path(member.name)
 
-                        if self._is_in_opaque_dir(member, opaque_dirs):
-                            self.log.debug(
-                                "Skipping file '%s' because it is in an opaque directory" % normalized_name)
-                            continue
+                    if self._is_in_opaque_dir(member, opaque_dirs):
+                        self.log.debug(
+                            "Skipping file '%s' because it is in an opaque directory" % normalized_name)
+                        continue
 
-                        # Skip all symlinks, we'll investigate them later
-                        if member.issym():
-                            skipped_sym_link_files[normalized_name] = member
-                            continue
+                    # Skip all symlinks, we'll investigate them later
+                    if member.issym():
+                        skipped_sym_link_files[normalized_name] = member
+                        continue
 
-                        if member in skipped_markers.keys():
-                            self.log.debug(
-                                "Skipping '%s' marker file, at the end of squashing we'll see if it's necessary to add it back" % normalized_name)
-                            continue
+                    if member in skipped_markers.keys():
+                        self.log.debug(
+                            "Skipping '%s' marker file, at the end of squashing we'll see if it's necessary to add it back" % normalized_name)
+                        continue
 
-                        if self._file_should_be_skipped(normalized_name, skipped_sym_links):
-                            self.log.debug(
-                                "Skipping '%s' file because it's on a symlink path, at the end of squashing we'll see if it's necessary to add it back" % normalized_name)
-
-                            if member.isfile():
-                                f = (member, layer_tar.extractfile(member))
-                            else:
-                                f = (member, None)
-
-                            skipped_files_in_layer[normalized_name] = f
-                            continue
-
-                        # Skip files that are marked to be skipped
-                        if self._file_should_be_skipped(normalized_name, to_skip):
-                            self.log.debug(
-                                "Skipping '%s' file because it's on the list to skip files" % normalized_name)
-                            continue
-
-                        # Check if file is already added to the archive
-                        if normalized_name in squashed_files:
-                            # File already exist in the squashed archive, skip it because
-                            # file want to add is older than the one already in the archive.
-                            # This is true because we do reverse squashing - from
-                            # newer to older layer
-                            self.log.debug(
-                                "Skipping '%s' file because it's older than file already added to the archive" % normalized_name)
-                            continue
-
-                        # Hard links are processed after everything else
-                        if member.islnk():
-                            skipped_hard_link_files[normalized_name] = member
-                            continue
-
-                        content = None
+                    if self._file_should_be_skipped(normalized_name, skipped_sym_links):
+                        self.log.debug(
+                            "Skipping '%s' file because it's on a symlink path, at the end of squashing we'll see if it's necessary to add it back" % normalized_name)
 
                         if member.isfile():
-                            content = layer_tar.extractfile(member)
+                            f = (member, layer_tar.extractfile(member))
+                        else:
+                            f = (member, None)
 
-                        self._add_file(member, content,
-                                       squashed_tar, squashed_files, to_skip)
+                        skipped_files_in_layer[normalized_name] = f
+                        continue
 
-                    skipped_hard_links.append(skipped_hard_link_files)
-                    skipped_files.append(skipped_files_in_layer)
-                    opaque_dirs += layer_opaque_dirs
+                    # Skip files that are marked to be skipped
+                    if self._file_should_be_skipped(normalized_name, to_skip):
+                        self.log.debug(
+                            "Skipping '%s' file because it's on the list to skip files" % normalized_name)
+                        continue
+
+                    # Check if file is already added to the archive
+                    if normalized_name in squashed_files:
+                        # File already exist in the squashed archive, skip it because
+                        # file want to add is older than the one already in the archive.
+                        # This is true because we do reverse squashing - from
+                        # newer to older layer
+                        self.log.debug(
+                            "Skipping '%s' file because it's older than file already added to the archive" % normalized_name)
+                        continue
+
+                    # Hard links are processed after everything else
+                    if member.islnk():
+                        skipped_hard_link_files[normalized_name] = member
+                        continue
+
+                    content = None
+
+                    if member.isfile():
+                        content = layer_tar.extractfile(member)
+
+                    self._add_file(member, content,
+                                   squashed_tar, squashed_files, to_skip)
+
+                skipped_hard_links.append(skipped_hard_link_files)
+                skipped_files.append(skipped_files_in_layer)
+                opaque_dirs += layer_opaque_dirs
 
             self._add_hardlinks(squashed_tar, squashed_files,
                                 to_skip, skipped_hard_links)
@@ -845,6 +848,9 @@ class Image(object):
                 self._add_markers(skipped_markers, squashed_tar,
                                   files_in_layers_to_move, added_symlinks)
 
+            tar: tarfile.TarFile
+            for tar in reading_layers:
+                tar.close()
         self.log.info("Squashing finished!")
 
     def _is_in_opaque_dir(self, member, dirs):

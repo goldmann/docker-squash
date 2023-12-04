@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import os
-from distutils.version import StrictVersion
 
 import docker
+from packaging import version as packaging_version
 
 from docker_squash.errors import SquashError
 from docker_squash.lib import common
@@ -64,7 +64,9 @@ class Squash(object):
                 % self.output_path
             )
 
-        if StrictVersion(docker_version["ApiVersion"]) >= StrictVersion("1.22"):
+        if packaging_version.parse(
+            docker_version["ApiVersion"]
+        ) >= packaging_version.parse("1.22"):
             image = V2Image(
                 self.log,
                 self.docker,

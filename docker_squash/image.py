@@ -194,8 +194,7 @@ class Image(object):
 
             if not squash_id:
                 raise SquashError(
-                    "The %s layer could not be found in the %s image"
-                    % (self.from_layer, self.image)
+                    f"The {self.from_layer} layer could not be found in the {self.image} image"
                 )
 
             number_of_layers = (

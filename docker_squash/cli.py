@@ -50,7 +50,7 @@ class CLI(object):
 
         self.log = logging.getLogger()
         formatter = logging.Formatter(
-            "%(asctime)s %(name)-12s %(levelname)-8s %(message)s"
+            "%(asctime)s %(filename)s:%(lineno)-10s %(levelname)-5s %(message)s"
         )
 
         handler_out.setFormatter(formatter)

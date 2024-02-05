@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import os
+from logging import Logger
 
 import docker
 from packaging import version as packaging_version
 
 from docker_squash.errors import SquashError
+from docker_squash.image import Image
 from docker_squash.lib import common
 from docker_squash.v1_image import V1Image
 from docker_squash.v2_image import V2Image
@@ -26,9 +28,9 @@ class Squash(object):
         load_image=True,
         cleanup=False,
     ):
-        self.log = log
+        self.log: Logger = log
         self.docker = docker
-        self.image = image
+        self.image: str = image
         self.from_layer = from_layer
         self.tag = tag
         self.comment = comment
@@ -68,7 +70,7 @@ class Squash(object):
         if packaging_version.parse(
             docker_version["ApiVersion"]
         ) >= packaging_version.parse("1.22"):
-            image = V2Image(
+            image: Image = V2Image(
                 self.log,
                 self.docker,
                 self.image,
@@ -78,7 +80,7 @@ class Squash(object):
                 self.comment,
             )
         else:
-            image = V1Image(
+            image: Image = V1Image(
                 self.log,
                 self.docker,
                 self.image,
@@ -123,7 +125,7 @@ class Squash(object):
                 )
             )
 
-    def squash(self, image):
+    def squash(self, image: Image):
         # Do the actual squashing
         new_image_id = image.squash()
 

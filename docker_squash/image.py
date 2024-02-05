@@ -45,16 +45,17 @@ class Image(object):
     def __init__(
         self, log, docker, image, from_layer, tmp_dir=None, tag=None, comment=""
     ):
-        self.log = log
+        self.log: logging.Logger = log
         self.debug = self.log.isEnabledFor(logging.DEBUG)
         self.docker = docker
-        self.image = image
+        self.image: str = image
         self.from_layer = from_layer
         self.tag = tag
         self.comment = comment
         self.image_name = None
         self.image_tag = None
         self.squash_id = None
+        self.oci_format = False
 
         # Workaround for https://play.golang.org/p/sCsWMXYxqy
         #
@@ -95,11 +96,11 @@ class Image(object):
             raise SquashError("Preparing temporary directory failed")
 
         # Temporary location on the disk of the old, unpacked *image*
-        self.old_image_dir = os.path.join(self.tmp_dir, "old")
+        self.old_image_dir: str = os.path.join(self.tmp_dir, "old")
         # Temporary location on the disk of the new, unpacked, squashed *image*
-        self.new_image_dir = os.path.join(self.tmp_dir, "new")
+        self.new_image_dir: str = os.path.join(self.tmp_dir, "new")
         # Temporary location on the disk of the squashed *layer*
-        self.squashed_dir = os.path.join(self.new_image_dir, "squashed")
+        self.squashed_dir: str = os.path.join(self.new_image_dir, "squashed")
 
         for d in self.old_image_dir, self.new_image_dir:
             os.makedirs(d)
@@ -155,6 +156,11 @@ class Image(object):
 
         # Location of the tar archive with squashed layers
         self.squashed_tar = os.path.join(self.squashed_dir, "layer.tar")
+        self.log.warning(
+            f"### got squashed_dir %s and squashed_tar %s",
+            self.squashed_dir,
+            self.squashed_tar,
+        )
 
         if self.tag:
             self.image_name, self.image_tag = self._parse_image_name(self.tag)
@@ -172,8 +178,15 @@ class Image(object):
 
         # Read all layers in the image
         self._read_layers(self.old_image_layers, self.old_image_id)
+        self.log.warning(f"### old_image_layers %s", self.old_image_layers)
 
         self.old_image_layers.reverse()
+        self.log.warning(f"### old_image_layers %s", self.old_image_layers)
+        self.log.warning(
+            f"### got squashed_dir %s and squashed_tar %s",
+            self.squashed_dir,
+            self.squashed_tar,
+        )
 
         self.log.info("Old image has %s layers", len(self.old_image_layers))
         self.log.debug("Old layers: %s", self.old_image_layers)
@@ -281,7 +294,7 @@ class Image(object):
                 % (self.image_name, self.image_tag)
             )
 
-    def _files_in_layers(self, layers, directory):
+    def _files_in_layers(self, layers):
         """
         Prepare a list of files in all layers
         """
@@ -289,14 +302,15 @@ class Image(object):
 
         for layer in layers:
             self.log.debug("Generating list of files in layer '%s'..." % layer)
-            tar_file = os.path.join(directory, layer, "layer.tar")
+            tar_file = self._extract_tar_name(layer)
+            # tar_file = os.path.join(self.old_image_dir, layer, "layer.tar")
             with tarfile.open(tar_file, "r", format=tarfile.PAX_FORMAT) as tar:
                 files[layer] = [self._normalize_path(x) for x in tar.getnames()]
             self.log.debug("Done, found %s files" % len(files[layer]))
 
         return files
 
-    def _prepare_tmp_directory(self, tmp_dir):
+    def _prepare_tmp_directory(self, tmp_dir: str) -> str:
         """Creates temporary directory that is used to work on layers"""
 
         if tmp_dir:
@@ -376,7 +390,7 @@ class Image(object):
 
                 if int(docker.__version__.split(".")[0]) < 3:
                     # Docker library prior to 3.0.0 returned the requests
-                    # object directly which cold be used to read from
+                    # object directly which could be used to read from
                     self.log.debug(
                         "Extracting image using HTTPResponse object directly"
                     )
@@ -500,7 +514,7 @@ class Image(object):
 
         return metadata
 
-    def _move_layers(self, layers, src, dest):
+    def _move_layers(self, layers, src: str, dest: str):
         """
         This moves all the layers that should be copied as-is.
         In other words - all layers that are not meant to be squashed will be
@@ -530,7 +544,7 @@ class Image(object):
         """
         Searches for marker files in the specified archive.
 
-        Docker marker files are files taht have the .wh. prefix in the name.
+        Docker marker files are files that have the .wh. prefix in the name.
         These files mark the corresponding file to be removed (hidden) when
         we start a container from the image.
         """
@@ -743,17 +757,18 @@ class Image(object):
 
         return added_symlinks
 
-    def _squash_layers(self, layers_to_squash, layers_to_move):
-        self.log.info("Starting squashing...")
+    def _squash_layers(self, layers_to_squash: List[str], layers_to_move: List[str]):
+        self.log.info(f"Starting squashing for {self.squashed_tar}...")
 
+        self.log.warning(
+            f"### layers squash  {layers_to_squash} and move {layers_to_move} and {os.path.exists(self.squashed_tar)}"
+        )
         # Reverse the layers to squash - we begin with the newest one
         # to make the tar lighter
         layers_to_squash.reverse()
 
         # Find all files in layers that we don't squash
-        files_in_layers_to_move = self._files_in_layers(
-            layers_to_move, self.old_image_dir
-        )
+        files_in_layers_to_move = self._files_in_layers(layers_to_move)
 
         with tarfile.open(
             self.squashed_tar, "w", format=tarfile.PAX_FORMAT
@@ -770,7 +785,11 @@ class Image(object):
             reading_layers: List[tarfile.TarFile] = []
 
             for layer_id in layers_to_squash:
-                layer_tar_file = os.path.join(self.old_image_dir, layer_id, "layer.tar")
+                layer_tar_file = self._extract_tar_name(layer_id)
+                # if self.oci_format:
+                #     layer_tar_file = os.path.join(self.old_image_dir, layer_id)
+                # else:
+                #     layer_tar_file = os.path.join(self.old_image_dir, layer_id, "layer.tar")
 
                 self.log.info("Squashing file '%s'..." % layer_tar_file)
 
@@ -1028,3 +1047,9 @@ class Image(object):
         return itertools.accumulate(
             path.parts[:-1], func=lambda head, tail: str(path.__class__(head, tail))
         )
+
+    def _extract_tar_name(self, path: str) -> str:
+        if self.oci_format:
+            return os.path.join(self.old_image_dir, path)
+        else:
+            return os.path.join(self.old_image_dir, path, "layer.tar")

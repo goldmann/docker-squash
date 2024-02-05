@@ -11,6 +11,7 @@ from io import BytesIO
 
 import mock
 import pytest
+from packaging import version as packaging_version
 
 from docker_squash.errors import SquashError, SquashUnnecessaryError
 from docker_squash.lib import common
@@ -202,9 +203,19 @@ class IntegSquash(unittest.TestCase):
             self.tar.seek(0)
             with tarfile.open(fileobj=self.tar, mode="r") as tar:
                 self.squashed_layer_path = ImageHelper.top_layer_path(tar)
-            return self._extract_file(
-                "%s/layer.tar" % self.squashed_layer_path, self.tar
+            self.log.warning(
+                f"### Attempting to extract tar from {self.squashed_layer_path}"
             )
+            if packaging_version.parse(
+                self.docker.version().get("Version")
+            ) >= packaging_version.parse("25.0"):
+                return self._extract_file(
+                    "blobs/sha256/%s" % self.squashed_layer_path, self.tar
+                )
+            else:
+                return self._extract_file(
+                    "%s/layer.tar" % self.squashed_layer_path, self.tar
+                )
 
         def assertFileExists(self, name):
             self.squashed_layer.seek(0)  # Rewind

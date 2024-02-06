@@ -62,7 +62,6 @@ Usage
       -h, --help            show this help message and exit
       -v, --verbose         Verbose output
       --version             Show version and exit
-      -d, --development     Does not clean up after failure for easier debugging
       -f FROM_LAYER, --from-layer FROM_LAYER
                             Number of layers to squash or ID of the layer (or image ID or image name) to squash from.
                             In case the provided value is an integer, specified number of layers will be squashed.
@@ -71,7 +70,8 @@ Usage
       -m MESSAGE, --message MESSAGE
                             Specify a commit message (comment) for the new image.
       -c, --cleanup         Remove source image from Docker after squashing
-      --tmp-dir TMP_DIR     Temporary directory to be created and used
+      --tmp-dir TMP_DIR     Temporary directory to be created and used. This will NOT be deleted afterwards for
+                            easier debugging.
       --output-path OUTPUT_PATH
                             Path where the image may be stored after squashing.
       --load-image [LOAD_IMAGE]

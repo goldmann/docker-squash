@@ -24,7 +24,6 @@ class Squash(object):
         tmp_dir=None,
         output_path=None,
         load_image=True,
-        development=False,
         cleanup=False,
     ):
         self.log = log
@@ -36,9 +35,11 @@ class Squash(object):
         self.tmp_dir = tmp_dir
         self.output_path = output_path
         self.load_image = load_image
-        self.development = development
         self.cleanup = cleanup
+        self.development = False
 
+        if tmp_dir:
+            self.development = True
         if not docker:
             self.docker = common.docker_client(self.log)
 

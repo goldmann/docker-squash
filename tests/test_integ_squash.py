@@ -37,7 +37,9 @@ class IntegSquash(unittest.TestCase):
 
     log = logging.getLogger()
     handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(asctime)s %(name)-12s %(levelname)-8s %(message)s")
+    formatter = logging.Formatter(
+        "%(asctime)s %(filename)s:%(lineno)-10s %(levelname)-5s %(message)s"
+    )
     handler.setFormatter(formatter)
     log.addHandler(handler)
     log.setLevel(logging.DEBUG)

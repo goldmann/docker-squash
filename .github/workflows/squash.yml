@@ -9,12 +9,12 @@ on:
       - main
 
 jobs:
-  build:
+  build-1:
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11']
+        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
@@ -24,6 +24,38 @@ jobs:
       - name: Setup
         run: |
           sudo apt-get update
+          pip install -U pip
+          pip install "tox<4.0.0"
+      - name: Info
+        run: |
+          docker version
+          docker info
+      - name: Run tests
+        run: |
+          PV=${{ matrix.python-version }}
+          echo "Running tests for Python version  $PV ( ${PV/./} )"
+          make test-py"${PV/./}"
+  build-2:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup
+        run: |
+          for pkg in containerd runc; do sudo apt-get remove $pkg; done
+          sudo apt-get update
+          sudo apt-get install ca-certificates curl
+          sudo install -m 0755 -d /etc/apt/keyrings
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
           pip install -U pip
           pip install "tox<4.0.0"
       - name: Info

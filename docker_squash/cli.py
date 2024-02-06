@@ -90,6 +90,7 @@ class CLI(object):
         parser.add_argument(
             "-m",
             "--message",
+            default="",
             help="Specify a commit message (comment) for the new image.",
         )
         parser.add_argument(

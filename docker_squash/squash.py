@@ -2,8 +2,9 @@
 
 import os
 from logging import Logger
+from typing import Optional
 
-import docker
+import docker.errors as docker_errors
 from packaging import version as packaging_version
 
 from docker_squash.errors import SquashError
@@ -20,24 +21,24 @@ class Squash(object):
         log,
         image,
         docker=None,
-        from_layer=None,
-        tag=None,
-        comment="",
-        tmp_dir=None,
-        output_path=None,
-        load_image=True,
-        cleanup=False,
+        from_layer: Optional[str] = None,
+        tag: Optional[str] = None,
+        comment: Optional[str] = "",
+        tmp_dir: Optional[str] = None,
+        output_path: Optional[str] = None,
+        load_image: Optional[bool] = True,
+        cleanup: Optional[bool] = False,
     ):
         self.log: Logger = log
         self.docker = docker
         self.image: str = image
-        self.from_layer = from_layer
-        self.tag = tag
-        self.comment = comment
-        self.tmp_dir = tmp_dir
-        self.output_path = output_path
-        self.load_image = load_image
-        self.cleanup = cleanup
+        self.from_layer: str = from_layer
+        self.tag: str = tag
+        self.comment: str = comment
+        self.tmp_dir: str = tmp_dir
+        self.output_path: str = output_path
+        self.load_image: bool = load_image
+        self.cleanup: bool = cleanup
         self.development = False
 
         if tmp_dir:
@@ -105,7 +106,7 @@ class Squash(object):
     def _cleanup(self):
         try:
             image_id = self.docker.inspect_image(self.image)["Id"]
-        except docker.errors.APIError as ex:
+        except docker_errors.APIError as ex:
             self.log.warning(
                 "Could not get the image ID for {} image: {}, skipping cleanup after squashing".format(
                     self.image, str(ex)
@@ -118,7 +119,7 @@ class Squash(object):
         try:
             self.docker.remove_image(image_id, force=False, noprune=False)
             self.log.info("Image {} removed!".format(self.image))
-        except docker.errors.APIError as ex:
+        except docker_errors.APIError as ex:
             self.log.warning(
                 "Could not remove image {}: {}, skipping cleanup after squashing".format(
                     self.image, str(ex)

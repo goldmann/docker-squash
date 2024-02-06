@@ -16,18 +16,16 @@ class V2Image(Image):
     def _before_squashing(self):
         super(V2Image, self)._before_squashing()
 
-        self.log.warning(f"### got old_image %s", self.old_image_dir)
-
         # Read old image manifest file
         self.old_image_manifest = self._get_manifest()
-        self.log.warning(f"### manifest %s", json.dumps(self.old_image_manifest, indent=4))
+        self.log.debug(
+            f"Retrieved manifest {json.dumps(self.old_image_manifest, indent=4)}"
+        )
 
         # Read old image config file
         self.old_image_config = self._read_json_file(
             os.path.join(self.old_image_dir, self.old_image_manifest["Config"])
         )
-        self.log.warning(f"### old config %s", json.dumps(self.old_image_config, indent=4))
-        self.log.warning(f"### config %s" , self.old_image_manifest["Config"])
 
         # Read layer paths inside of the tar archive
         # We split it into layers that needs to be squashed
@@ -40,7 +38,6 @@ class V2Image(Image):
 
         if self.layer_paths_to_move:
             self.squash_id = self.layer_paths_to_move[-1]
-        self.log.warning(f"### layer_paths_to_squash {self.layers_to_squash} layer_paths_to_move {self.layer_paths_to_move} ")
 
     def _squash(self):
         if self.layer_paths_to_squash:
@@ -62,7 +59,6 @@ class V2Image(Image):
             # we store the layer data inside of the tar archive
             layer_path_id = self._generate_squashed_layer_path_id()
 
-            self.log.warning(f"### manifest %s", json.dumps(self.old_image_manifest, indent=4))
             if self.oci_format:
                 old_layer_path = self.old_image_manifest["Config"]
             else:
@@ -72,9 +68,7 @@ class V2Image(Image):
                     old_layer_path = layer_path_id
                 old_layer_path = os.path.join(old_layer_path, "json")
 
-            self.log.warning(f"### old_layer_path {old_layer_path}")
-            metadata = self._generate_last_layer_metadata(
-                layer_path_id, old_layer_path)
+            metadata = self._generate_last_layer_metadata(layer_path_id, old_layer_path)
             self._write_squashed_layer_metadata(metadata)
 
             # Write version file to the squashed layer
@@ -148,7 +142,6 @@ class V2Image(Image):
         if image_name and image_tag:
             manifest["RepoTags"] = ["%s:%s" % (image_name, image_tag)]
 
-        # TODO: index into the layers
         manifest["Layers"] = old_image_manifest["Layers"][: len(layer_paths_to_move)]
 
         if layer_path_id:
@@ -164,7 +157,9 @@ class V2Image(Image):
         with open(json_file, "r") as f:
             return json.load(f, object_pairs_hook=OrderedDict)
 
-    def _read_layer_paths(self, old_image_config, old_image_manifest, layers_to_move) -> Tuple[List[str], List[str]]:
+    def _read_layer_paths(
+        self, old_image_config, old_image_manifest, layers_to_move: List[str]
+    ) -> Tuple[List[str], List[str]]:
         """
         In case of v2 format, layer id's are not the same as the id's
         used in the exported tar archive to name directories for layers.
@@ -185,13 +180,16 @@ class V2Image(Image):
             # (directory name) where the layer's data is
             # stored
             if not layer.get("empty_layer", False):
+                # Under <25 layers look like
+                # 27f9b97654306a5389e8e48ba3486a11026d34055e1907672231cbd8e1380481/layer.tar
+                # while >=25 layers look like
+                # blobs/sha256/d6a7fc1fb44b63324d3fc67f016e1ef7ecc1a5ae6668ae3072d2e17230e3cfbc
                 if self.oci_format:
                     layer_id = old_image_manifest["Layers"][current_manifest_layer]
                 else:
-                    layer_id = old_image_manifest["Layers"][current_manifest_layer].rsplit(
-                        "/"
-                    )[0]
-                self.log.warning(f"### current layer {old_image_manifest["Layers"][current_manifest_layer]} and id {layer_id}")
+                    layer_id = old_image_manifest["Layers"][
+                        current_manifest_layer
+                    ].rsplit("/")[0]
 
                 # Check if this layer should be moved or squashed
                 if len(layers_to_move) > i:
@@ -231,7 +229,6 @@ class V2Image(Image):
         for path in self.layer_paths_to_move:
             sha256 = self._compute_sha256(
                 self._extract_tar_name(path)
-                # os.path.join(self.old_image_dir, path, "layer.tar")
             )
             diff_ids.append(sha256)
 
@@ -318,7 +315,6 @@ class V2Image(Image):
 
     def _generate_last_layer_metadata(self, layer_path_id, old_layer_path: Path):
         config_file = os.path.join(self.old_image_dir, old_layer_path)
-        self.log.error(f"### Loading config file {config_file}")
         with open(config_file, "r") as f:
             config = json.load(f, object_pairs_hook=OrderedDict)
 
@@ -378,23 +374,26 @@ class V2Image(Image):
 
     def _get_manifest(self):
         if os.path.exists(os.path.join(self.old_image_dir, "index.json")):
-            self.oci_format = True
             # New OCI Archive format type
-            pointer = self._read_json_file(os.path.join(self.old_image_dir, "index.json"))['manifests']
-            self.log.warning(f"### get_manifest %s pointer %s ", os.path.exists(os.path.join(self.old_image_dir, "manifest.json")),
-                             json.dumps(pointer, indent=4))
-            if not pointer:
-                self.log.error("Unable to access list of manifests. Have we encountered https://github.com/moby/moby/issues/47210 ?")
-                # Fallback - Docker also writes a manifest.json which appears to be correct
-                if os.path.exists(os.path.join(self.old_image_dir, "manifest.json")):
-                    return (self._read_json_file(
+            self.oci_format = True
+            # Not using index.json to extract manifest details as while the config
+            # sha could be extracted via some indirection i.e.
+            #
+            # index.json:manifest/digest::sha256:<intermediary>
+            # blobs/sha256/<intermediary>:config/digest::sha256:<config>
+            #
+            # Docker spec currently will always include a manifest.json so will standardise
+            # on using that. Further we rely upon the original manifest format in order to write
+            # it back.
+            if os.path.exists(os.path.join(self.old_image_dir, "manifest.json")):
+                return (
+                    self._read_json_file(
                         os.path.join(self.old_image_dir, "manifest.json")
-                    ))[0]
-                else:
-                    raise SquashError("Unable to locate manifest.json or suitable manifest within index.json")
+                    )
+                )[0]
             else:
-                self.log.warning(f"### pointer %s", pointer['manifests']['digest'])
+                raise SquashError("Unable to locate manifest.json")
         else:
-            return (self._read_json_file(
-                    os.path.join(self.old_image_dir, "manifest.json")
-                ))[0]
+            return (
+                self._read_json_file(os.path.join(self.old_image_dir, "manifest.json"))
+            )[0]

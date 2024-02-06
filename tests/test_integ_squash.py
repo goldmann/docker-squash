@@ -203,9 +203,6 @@ class IntegSquash(unittest.TestCase):
             self.tar.seek(0)
             with tarfile.open(fileobj=self.tar, mode="r") as tar:
                 self.squashed_layer_path = ImageHelper.top_layer_path(tar)
-            self.log.warning(
-                f"### Attempting to extract tar from {self.squashed_layer_path}"
-            )
             if packaging_version.parse(
                 self.docker.version().get("Version")
             ) >= packaging_version.parse("25.0"):

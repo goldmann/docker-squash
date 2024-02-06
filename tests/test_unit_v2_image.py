@@ -188,7 +188,7 @@ class TestGeneratingMetadata(unittest.TestCase):
             builtins, "open", mock.mock_open(read_data=layer_config)
         ):
             metadata = self.image._generate_last_layer_metadata(
-                "squashed_layer_path_id"
+                "squashed_layer_path_id", "squashed_layer_path_id"
             )
 
             self.assertEqual(type(metadata), OrderedDict)

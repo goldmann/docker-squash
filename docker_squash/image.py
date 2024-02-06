@@ -18,7 +18,6 @@ from docker_squash.errors import SquashError, SquashUnnecessaryError
 
 
 class Chdir(object):
-
     """Context manager for changing the current working directory"""
 
     def __init__(self, newPath):

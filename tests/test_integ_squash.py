@@ -2,6 +2,7 @@ import codecs
 import json
 import logging
 import os
+import re
 import shutil
 import tarfile
 import unittest
@@ -9,6 +10,7 @@ import uuid
 from io import BytesIO
 
 import mock
+import pytest
 
 from docker_squash.errors import SquashError, SquashUnnecessaryError
 from docker_squash.lib import common
@@ -125,7 +127,6 @@ class IntegSquash(unittest.TestCase):
             numeric=False,
             tmp_dir=None,
             log=None,
-            development=False,
             tag=True,
         ):
             self.image = image
@@ -140,7 +141,6 @@ class IntegSquash(unittest.TestCase):
             self.load_image = load_image
             self.numeric = numeric
             self.tmp_dir = tmp_dir
-            self.development = development
 
         def __enter__(self):
             from_layer = self.number_of_layers
@@ -159,7 +159,6 @@ class IntegSquash(unittest.TestCase):
                 output_path=self.output_path,
                 load_image=self.load_image,
                 tmp_dir=self.tmp_dir,
-                development=self.development,
             )
 
             self.image_id = squash.run()
@@ -278,6 +277,10 @@ class IntegSquash(unittest.TestCase):
 
 
 class TestIntegSquash(IntegSquash):
+    @pytest.fixture(autouse=True)
+    def inject_fixtures(self, caplog):
+        self.caplog = caplog
+
     def test_all_files_should_be_in_squashed_layer(self):
         """
         We squash all layers in RUN, all files should be in the resulting squashed layer.
@@ -754,35 +757,29 @@ class TestIntegSquash(IntegSquash):
 
     # https://github.com/goldmann/docker-scripts/issues/44
     def test_remove_tmp_dir_after_failure(self):
+        self.caplog.set_level(logging.DEBUG, logger="cekit")
         dockerfile = """
         FROM busybox:1.24.0
         LABEL foo bar
         """
-
-        tmp_dir = "/tmp/docker-squash-integ-tmp-dir"
-        log = mock.Mock()
-        shutil.rmtree(tmp_dir, ignore_errors=True)
-
-        self.assertFalse(os.path.exists(tmp_dir))
 
         with self.Image(dockerfile) as image:
             with self.assertRaisesRegex(
                 SquashError,
                 r"Cannot squash 20 layers, the .* image contains only \d " r"layers",
             ):
-                with self.SquashedImage(
-                    image, 20, numeric=True, tmp_dir=tmp_dir, log=log
-                ):
+                with self.SquashedImage(image, 20, numeric=True):
                     pass
-
-        log.debug.assert_any_call(
-            "Using /tmp/docker-squash-integ-tmp-dir as the temporary directory"
-        )
-        log.debug.assert_any_call(
-            "Cleaning up /tmp/docker-squash-integ-tmp-dir temporary directory"
+        tmp_location = re.search(
+            ".*Using (.*)as the temporary directory.*", self.caplog.text
         )
 
-        self.assertFalse(os.path.exists(tmp_dir))
+        assert tmp_location
+        assert "Cleaning up %s temporary directory", (
+            tmp_location.group(1) in self.caplog.text
+        )
+
+        self.assertFalse(os.path.exists(tmp_location.group(1)))
 
     def test_should_not_remove_tmp_dir_after_failure_if_development_mode_is_on(self):
         dockerfile = """
@@ -802,7 +799,7 @@ class TestIntegSquash(IntegSquash):
                 r"Cannot squash 20 layers, the .* image contains only \d " r"layers",
             ):
                 with self.SquashedImage(
-                    image, 20, numeric=True, tmp_dir=tmp_dir, log=log, development=True
+                    image, 20, numeric=True, tmp_dir=tmp_dir, log=log
                 ):
                     pass
 

@@ -72,12 +72,6 @@ class CLI(object):
 
         parser.add_argument("image", help="Image to be squashed")
         parser.add_argument(
-            "-d",
-            "--development",
-            action="store_true",
-            help="Does not clean up after failure for easier debugging",
-        )
-        parser.add_argument(
             "-f",
             "--from-layer",
             help="Number of layers to squash or ID of the layer (or image ID or image name) to squash from. In case the provided value is an integer, specified number of layers will be squashed. Every layer in the image will be squashed if the parameter is not provided.",
@@ -100,7 +94,8 @@ class CLI(object):
             help="Remove source image from Docker after squashing",
         )
         parser.add_argument(
-            "--tmp-dir", help="Temporary directory to be created and used"
+            "--tmp-dir",
+            help="Temporary directory to be created and used. This will NOT be deleted afterwards for easier debugging.",
         )
         parser.add_argument(
             "--output-path",
@@ -133,7 +128,6 @@ class CLI(object):
                 output_path=args.output_path,
                 load_image=args.load_image,
                 tmp_dir=args.tmp_dir,
-                development=args.development,
                 cleanup=args.cleanup,
             ).run()
         except KeyboardInterrupt:
@@ -142,7 +136,7 @@ class CLI(object):
         except Exception:
             e = sys.exc_info()[1]
 
-            if args.development or args.verbose:
+            if args.verbose:
                 self.log.exception(e)
             else:
                 self.log.error(str(e))

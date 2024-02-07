@@ -41,6 +41,9 @@ class Squash(object):
         self.cleanup: bool = cleanup
         self.development = False
 
+        if tag == image and cleanup:
+            log.warning("Tag is the same as image; preventing cleanup")
+            self.cleanup = False
         if tmp_dir:
             self.development = True
         if not docker:

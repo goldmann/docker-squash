@@ -9,6 +9,7 @@ import unittest
 import uuid
 from io import BytesIO
 
+import docker.errors
 import mock
 import pytest
 from packaging import version as packaging_version
@@ -59,11 +60,11 @@ class IntegSquash(unittest.TestCase):
         IntegSquash.image.__exit__(None, None, None)
 
     class Image(object):
-        def __init__(self, dockerfile):
+        def __init__(self, dockerfile, tag="latest"):
             self.dockerfile = dockerfile
             self.docker = TestIntegSquash.docker
             self.name = "integ-%s" % uuid.uuid1()
-            self.tag = "%s:latest" % self.name
+            self.tag = f"{self.name}:{tag}"
 
         def __enter__(self):
             f = BytesIO(self.dockerfile.encode("utf-8"))
@@ -85,7 +86,11 @@ class IntegSquash(unittest.TestCase):
 
         def __exit__(self, exc_type, exc_val, exc_tb):
             if not os.getenv("CI"):
-                self.docker.remove_image(image=self.tag, force=True)
+                try:
+                    self.docker.remove_image(image=self.tag, force=True)
+                except docker.errors.DockerException:
+                    # Can throw if cleanup results in the same image being deleted.
+                    pass
 
         # Duplicated, I know...
         def _save_image(self):
@@ -129,6 +134,7 @@ class IntegSquash(unittest.TestCase):
             tmp_dir=None,
             log=None,
             tag=True,
+            cleanup=False,
         ):
             self.image = image
             self.number_of_layers = number_of_layers
@@ -142,6 +148,7 @@ class IntegSquash(unittest.TestCase):
             self.load_image = load_image
             self.numeric = numeric
             self.tmp_dir = tmp_dir
+            self.cleanup = cleanup
 
         def __enter__(self):
             from_layer = self.number_of_layers
@@ -160,6 +167,7 @@ class IntegSquash(unittest.TestCase):
                 output_path=self.output_path,
                 load_image=self.load_image,
                 tmp_dir=self.tmp_dir,
+                cleanup=self.cleanup,
             )
 
             self.image_id = squash.run()
@@ -242,6 +250,11 @@ class IntegSquash(unittest.TestCase):
                     "File '%s' should not be a hard link, but it is" % name
                 )
 
+        def assert_target_tag_exists(self):
+            if self.tag:
+                # Raise exception if it doesn't exist
+                self.docker.inspect_image(self.tag)
+
     class Container(object):
         def __init__(self, image):
             self.image = image
@@ -288,6 +301,22 @@ class TestIntegSquash(IntegSquash):
     @pytest.fixture(autouse=True)
     def inject_fixtures(self, caplog):
         self.caplog = caplog
+
+    def test_same_source_and_target_image_tag_should_not_be_deleted(self):
+        self.caplog.set_level(logging.DEBUG, logger="cekit")
+        dockerfile = (
+            """
+            FROM %s
+            RUN touch /somefile_layer1
+            RUN touch /somefile_layer2
+            """
+            % TestIntegSquash.BUSYBOX_IMAGE
+        )
+
+        with self.Image(dockerfile, tag="squashed") as image:
+            with self.SquashedImage(image, 2, cleanup=True) as squashed_image:
+                squashed_image.assert_target_tag_exists()
+        assert "Tag is the same as image; preventing cleanup" in self.caplog.text
 
     def test_all_files_should_be_in_squashed_layer(self):
         """

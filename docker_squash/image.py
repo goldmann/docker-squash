@@ -10,9 +10,9 @@ import shutil
 import tarfile
 import tempfile
 import threading
-from typing import List
+from typing import List, Optional, Union
 
-import docker
+import docker as docker_library
 
 from docker_squash.errors import SquashError, SquashUnnecessaryError
 
@@ -20,8 +20,8 @@ from docker_squash.errors import SquashError, SquashUnnecessaryError
 class Chdir(object):
     """Context manager for changing the current working directory"""
 
-    def __init__(self, newPath):
-        self.newPath = os.path.expanduser(newPath)
+    def __init__(self, new_path):
+        self.newPath = os.path.expanduser(new_path)
 
     def __enter__(self):
         self.savedPath = os.getcwd()
@@ -43,18 +43,26 @@ class Image(object):
     """ Image format version """
 
     def __init__(
-        self, log, docker, image, from_layer, tmp_dir=None, tag=None, comment=""
+        self,
+        log,
+        docker,
+        image,
+        from_layer,
+        tmp_dir: Optional[str] = None,
+        tag: Optional[str] = None,
+        comment: Optional[str] = "",
     ):
-        self.log = log
+        self.log: logging.Logger = log
         self.debug = self.log.isEnabledFor(logging.DEBUG)
         self.docker = docker
-        self.image = image
-        self.from_layer = from_layer
-        self.tag = tag
-        self.comment = comment
+        self.image: str = image
+        self.from_layer: str = from_layer
+        self.tag: str = tag
+        self.comment: str = comment
         self.image_name = None
         self.image_tag = None
         self.squash_id = None
+        self.oci_format = False
 
         # Workaround for https://play.golang.org/p/sCsWMXYxqy
         #
@@ -68,7 +76,7 @@ class Image(object):
         )
         """ Date used in metadata, already formatted using the `%Y-%m-%dT%H:%M:%S.%fZ` format """
 
-        self.tmp_dir = tmp_dir
+        self.tmp_dir: str = tmp_dir
         """ Main temporary directory to save all working files. This is the root directory for all other temporary files. """
 
     def squash(self):
@@ -95,11 +103,11 @@ class Image(object):
             raise SquashError("Preparing temporary directory failed")
 
         # Temporary location on the disk of the old, unpacked *image*
-        self.old_image_dir = os.path.join(self.tmp_dir, "old")
+        self.old_image_dir: str = os.path.join(self.tmp_dir, "old")
         # Temporary location on the disk of the new, unpacked, squashed *image*
-        self.new_image_dir = os.path.join(self.tmp_dir, "new")
+        self.new_image_dir: str = os.path.join(self.tmp_dir, "new")
         # Temporary location on the disk of the squashed *layer*
-        self.squashed_dir = os.path.join(self.new_image_dir, "squashed")
+        self.squashed_dir: str = os.path.join(self.new_image_dir, "squashed")
 
         for d in self.old_image_dir, self.new_image_dir:
             os.makedirs(d)
@@ -115,14 +123,12 @@ class Image(object):
             squash_id = self.docker.inspect_image(layer)["Id"]
         except Exception:
             raise SquashError(
-                "Could not get the layer ID to squash, please check provided 'layer' argument: %s"
-                % layer
+                f"Could not get the layer ID to squash, please check provided 'layer' argument: {layer}"
             )
 
         if squash_id not in self.old_image_layers:
             raise SquashError(
-                "Couldn't find the provided layer (%s) in the %s image"
-                % (layer, self.image)
+                f"Couldn't find the provided layer ({layer}) in the {self.image} image"
             )
 
         self.log.debug("Layer ID to squash from: %s" % squash_id)
@@ -138,16 +144,14 @@ class Image(object):
         # Only positive numbers are correct
         if number_of_layers <= 0:
             raise SquashError(
-                "Number of layers to squash cannot be less or equal 0, provided: %s"
-                % number_of_layers
+                f"Number of layers to squash cannot be less or equal 0, provided: {number_of_layers}"
             )
 
         # Do not squash if provided number of layer to squash is bigger
         # than number of actual layers in the image
         if number_of_layers > len(self.old_image_layers):
             raise SquashError(
-                "Cannot squash %s layers, the %s image contains only %s layers"
-                % (number_of_layers, self.image, len(self.old_image_layers))
+                f"Cannot squash {number_of_layers} layers, the {self.image} image contains only {len(self.old_image_layers)} layers"
             )
 
     def _before_squashing(self):
@@ -164,17 +168,14 @@ class Image(object):
             self.old_image_id = self.docker.inspect_image(self.image)["Id"]
         except SquashError:
             raise SquashError(
-                "Could not get the image ID to squash, please check provided 'image' argument: %s"
-                % self.image
+                f"Could not get the image ID to squash, please check provided 'image' argument: {self.image}"
             )
 
         self.old_image_layers = []
 
         # Read all layers in the image
         self._read_layers(self.old_image_layers, self.old_image_id)
-
         self.old_image_layers.reverse()
-
         self.log.info("Old image has %s layers", len(self.old_image_layers))
         self.log.debug("Old layers: %s", self.old_image_layers)
 
@@ -193,8 +194,7 @@ class Image(object):
 
             if not squash_id:
                 raise SquashError(
-                    "The %s layer could not be found in the %s image"
-                    % (self.from_layer, self.image)
+                    f"The {self.from_layer} layer could not be found in the {self.image} image"
                 )
 
             number_of_layers = (
@@ -212,7 +212,7 @@ class Image(object):
 
         if len(self.layers_to_squash) < 1:
             raise SquashError(
-                "Invalid number of layers to squash: %s" % len(self.layers_to_squash)
+                f"Invalid number of layers to squash: {len(self.layers_to_squash)}"
             )
 
         if len(self.layers_to_squash) == 1:
@@ -233,6 +233,7 @@ class Image(object):
 
     def _after_squashing(self):
         self.log.debug("Removing from disk already squashed layers...")
+        self.log.debug("Cleaning up %s temporary directory" % self.old_image_dir)
         shutil.rmtree(self.old_image_dir, ignore_errors=True)
 
         self.size_after = self._dir_size(self.new_image_dir)
@@ -281,7 +282,7 @@ class Image(object):
                 % (self.image_name, self.image_tag)
             )
 
-    def _files_in_layers(self, layers, directory):
+    def _files_in_layers(self, layers):
         """
         Prepare a list of files in all layers
         """
@@ -289,21 +290,20 @@ class Image(object):
 
         for layer in layers:
             self.log.debug("Generating list of files in layer '%s'..." % layer)
-            tar_file = os.path.join(directory, layer, "layer.tar")
+            tar_file = self._extract_tar_name(layer)
             with tarfile.open(tar_file, "r", format=tarfile.PAX_FORMAT) as tar:
                 files[layer] = [self._normalize_path(x) for x in tar.getnames()]
             self.log.debug("Done, found %s files" % len(files[layer]))
 
         return files
 
-    def _prepare_tmp_directory(self, tmp_dir):
+    def _prepare_tmp_directory(self, tmp_dir: str) -> str:
         """Creates temporary directory that is used to work on layers"""
 
         if tmp_dir:
             if os.path.exists(tmp_dir):
                 raise SquashError(
-                    "The '%s' directory already exists, please remove it before you proceed"
-                    % tmp_dir
+                    f"The '{tmp_dir}' directory already exists, please remove it before you proceed"
                 )
             os.makedirs(tmp_dir)
         else:
@@ -374,9 +374,9 @@ class Image(object):
             try:
                 image = self.docker.get_image(image_id)
 
-                if int(docker.__version__.split(".")[0]) < 3:
+                if int(docker_library.__version__.split(".")[0]) < 3:
                     # Docker library prior to 3.0.0 returned the requests
-                    # object directly which cold be used to read from
+                    # object directly which could be used to read from
                     self.log.debug(
                         "Extracting image using HTTPResponse object directly"
                     )
@@ -408,10 +408,10 @@ class Image(object):
             except Exception as e:
                 self.log.exception(e)
                 self.log.warning(
-                    "An error occured while saving the %s image, retrying..." % image_id
+                    f"An error occurred while saving the {image_id} image, retrying..."
                 )
 
-        raise SquashError("Couldn't save %s image!" % image_id)
+        raise SquashError(f"Couldn't save {image_id} image!")
 
     def _unpack(self, tar_file, directory):
         """Unpacks tar archive to selected directory"""
@@ -500,7 +500,7 @@ class Image(object):
 
         return metadata
 
-    def _move_layers(self, layers, src, dest):
+    def _move_layers(self, layers, src: str, dest: str):
         """
         This moves all the layers that should be copied as-is.
         In other words - all layers that are not meant to be squashed will be
@@ -530,7 +530,7 @@ class Image(object):
         """
         Searches for marker files in the specified archive.
 
-        Docker marker files are files taht have the .wh. prefix in the name.
+        Docker marker files are files that have the .wh. prefix in the name.
         These files mark the corresponding file to be removed (hidden) when
         we start a container from the image.
         """
@@ -609,7 +609,9 @@ class Image(object):
             else:
                 self.log.debug("Skipping '%s' marker file..." % marker.name)
 
-    def _normalize_path(self, path):
+    def _normalize_path(
+        self, path: Union[str, pathlib.Path]
+    ) -> Union[str, pathlib.Path]:
         return os.path.normpath(os.path.join("/", path))
 
     def _add_hardlinks(self, squashed_tar, squashed_files, to_skip, skipped_hard_links):
@@ -743,17 +745,15 @@ class Image(object):
 
         return added_symlinks
 
-    def _squash_layers(self, layers_to_squash, layers_to_move):
-        self.log.info("Starting squashing...")
+    def _squash_layers(self, layers_to_squash: List[str], layers_to_move: List[str]):
+        self.log.info(f"Starting squashing for {self.squashed_tar}...")
 
         # Reverse the layers to squash - we begin with the newest one
         # to make the tar lighter
         layers_to_squash.reverse()
 
         # Find all files in layers that we don't squash
-        files_in_layers_to_move = self._files_in_layers(
-            layers_to_move, self.old_image_dir
-        )
+        files_in_layers_to_move = self._files_in_layers(layers_to_move)
 
         with tarfile.open(
             self.squashed_tar, "w", format=tarfile.PAX_FORMAT
@@ -770,8 +770,7 @@ class Image(object):
             reading_layers: List[tarfile.TarFile] = []
 
             for layer_id in layers_to_squash:
-                layer_tar_file = os.path.join(self.old_image_dir, layer_id, "layer.tar")
-
+                layer_tar_file = self._extract_tar_name(layer_id)
                 self.log.info("Squashing file '%s'..." % layer_tar_file)
 
                 # Open the exiting layer to squash
@@ -1028,3 +1027,9 @@ class Image(object):
         return itertools.accumulate(
             path.parts[:-1], func=lambda head, tail: str(path.__class__(head, tail))
         )
+
+    def _extract_tar_name(self, path: str) -> str:
+        if self.oci_format:
+            return os.path.join(self.old_image_dir, path)
+        else:
+            return os.path.join(self.old_image_dir, path, "layer.tar")

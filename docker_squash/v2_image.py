@@ -3,7 +3,10 @@ import json
 import os
 import shutil
 from collections import OrderedDict
+from pathlib import Path
+from typing import List, Tuple
 
+from docker_squash.errors import SquashError
 from docker_squash.image import Image
 
 
@@ -14,9 +17,10 @@ class V2Image(Image):
         super(V2Image, self)._before_squashing()
 
         # Read old image manifest file
-        self.old_image_manifest = self._read_json_file(
-            os.path.join(self.old_image_dir, "manifest.json")
-        )[0]
+        self.old_image_manifest = self._get_manifest()
+        self.log.debug(
+            f"Retrieved manifest {json.dumps(self.old_image_manifest, indent=4)}"
+        )
 
         # Read old image config file
         self.old_image_config = self._read_json_file(
@@ -26,6 +30,8 @@ class V2Image(Image):
         # Read layer paths inside of the tar archive
         # We split it into layers that needs to be squashed
         # and layers that needs to be moved as-is
+        self.layer_paths_to_squash: List[str] = []
+        self.layer_paths_to_move: List[str] = []
         self.layer_paths_to_squash, self.layer_paths_to_move = self._read_layer_paths(
             self.old_image_config, self.old_image_manifest, self.layers_to_move
         )
@@ -53,9 +59,16 @@ class V2Image(Image):
             # we store the layer data inside of the tar archive
             layer_path_id = self._generate_squashed_layer_path_id()
 
-            metadata = self._generate_last_layer_metadata(
-                layer_path_id, self.layer_paths_to_squash[0]
-            )
+            if self.oci_format:
+                old_layer_path = self.old_image_manifest["Config"]
+            else:
+                if self.layer_paths_to_squash[0]:
+                    old_layer_path = self.layer_paths_to_squash[0]
+                else:
+                    old_layer_path = layer_path_id
+                old_layer_path = os.path.join(old_layer_path, "json")
+
+            metadata = self._generate_last_layer_metadata(layer_path_id, old_layer_path)
             self._write_squashed_layer_metadata(metadata)
 
             # Write version file to the squashed layer
@@ -139,12 +152,14 @@ class V2Image(Image):
     def _read_json_file(self, json_file):
         """Helper function to read JSON file as OrderedDict"""
 
-        self.log.debug("Reading '%s' JSON file..." % json_file)
+        self.log.debug(f"Reading '{json_file}' JSON file...")
 
         with open(json_file, "r") as f:
             return json.load(f, object_pairs_hook=OrderedDict)
 
-    def _read_layer_paths(self, old_image_config, old_image_manifest, layers_to_move):
+    def _read_layer_paths(
+        self, old_image_config, old_image_manifest, layers_to_move: List[str]
+    ) -> Tuple[List[str], List[str]]:
         """
         In case of v2 format, layer id's are not the same as the id's
         used in the exported tar archive to name directories for layers.
@@ -165,9 +180,16 @@ class V2Image(Image):
             # (directory name) where the layer's data is
             # stored
             if not layer.get("empty_layer", False):
-                layer_id = old_image_manifest["Layers"][current_manifest_layer].rsplit(
-                    "/"
-                )[0]
+                # Under <25 layers look like
+                # 27f9b97654306a5389e8e48ba3486a11026d34055e1907672231cbd8e1380481/layer.tar
+                # while >=25 layers look like
+                # blobs/sha256/d6a7fc1fb44b63324d3fc67f016e1ef7ecc1a5ae6668ae3072d2e17230e3cfbc
+                if self.oci_format:
+                    layer_id = old_image_manifest["Layers"][current_manifest_layer]
+                else:
+                    layer_id = old_image_manifest["Layers"][
+                        current_manifest_layer
+                    ].rsplit("/")[0]
 
                 # Check if this layer should be moved or squashed
                 if len(layers_to_move) > i:
@@ -205,9 +227,7 @@ class V2Image(Image):
         diff_ids = []
 
         for path in self.layer_paths_to_move:
-            sha256 = self._compute_sha256(
-                os.path.join(self.old_image_dir, path, "layer.tar")
-            )
+            sha256 = self._compute_sha256(self._extract_tar_name(path))
             diff_ids.append(sha256)
 
         if self.layer_paths_to_squash:
@@ -291,12 +311,8 @@ class V2Image(Image):
 
         return sha
 
-    def _generate_last_layer_metadata(self, layer_path_id, old_layer_path=None):
-        if not old_layer_path:
-            old_layer_path = layer_path_id
-
-        config_file = os.path.join(self.old_image_dir, old_layer_path, "json")
-
+    def _generate_last_layer_metadata(self, layer_path_id, old_layer_path: Path):
+        config_file = os.path.join(self.old_image_dir, old_layer_path)
         with open(config_file, "r") as f:
             config = json.load(f, object_pairs_hook=OrderedDict)
 
@@ -353,3 +369,29 @@ class V2Image(Image):
             metadata["config"]["Image"] = ""
 
         return metadata
+
+    def _get_manifest(self):
+        if os.path.exists(os.path.join(self.old_image_dir, "index.json")):
+            # New OCI Archive format type
+            self.oci_format = True
+            # Not using index.json to extract manifest details as while the config
+            # sha could be extracted via some indirection i.e.
+            #
+            # index.json:manifest/digest::sha256:<intermediary>
+            # blobs/sha256/<intermediary>:config/digest::sha256:<config>
+            #
+            # Docker spec currently will always include a manifest.json so will standardise
+            # on using that. Further we rely upon the original manifest format in order to write
+            # it back.
+            if os.path.exists(os.path.join(self.old_image_dir, "manifest.json")):
+                return (
+                    self._read_json_file(
+                        os.path.join(self.old_image_dir, "manifest.json")
+                    )
+                )[0]
+            else:
+                raise SquashError("Unable to locate manifest.json")
+        else:
+            return (
+                self._read_json_file(os.path.join(self.old_image_dir, "manifest.json"))
+            )[0]

@@ -123,14 +123,12 @@ class Image(object):
             squash_id = self.docker.inspect_image(layer)["Id"]
         except Exception:
             raise SquashError(
-                "Could not get the layer ID to squash, please check provided 'layer' argument: %s"
-                % layer
+                f"Could not get the layer ID to squash, please check provided 'layer' argument: {layer}"
             )
 
         if squash_id not in self.old_image_layers:
             raise SquashError(
-                "Couldn't find the provided layer (%s) in the %s image"
-                % (layer, self.image)
+                f"Couldn't find the provided layer ({layer}) in the {self.image} image"
             )
 
         self.log.debug("Layer ID to squash from: %s" % squash_id)
@@ -146,16 +144,14 @@ class Image(object):
         # Only positive numbers are correct
         if number_of_layers <= 0:
             raise SquashError(
-                "Number of layers to squash cannot be less or equal 0, provided: %s"
-                % number_of_layers
+                f"Number of layers to squash cannot be less or equal 0, provided: {number_of_layers}"
             )
 
         # Do not squash if provided number of layer to squash is bigger
         # than number of actual layers in the image
         if number_of_layers > len(self.old_image_layers):
             raise SquashError(
-                "Cannot squash %s layers, the %s image contains only %s layers"
-                % (number_of_layers, self.image, len(self.old_image_layers))
+                f"Cannot squash {number_of_layers} layers, the {self.image} image contains only {len(self.old_image_layers)} layers"
             )
 
     def _before_squashing(self):
@@ -172,8 +168,7 @@ class Image(object):
             self.old_image_id = self.docker.inspect_image(self.image)["Id"]
         except SquashError:
             raise SquashError(
-                "Could not get the image ID to squash, please check provided 'image' argument: %s"
-                % self.image
+                f"Could not get the image ID to squash, please check provided 'image' argument: {self.image}"
             )
 
         self.old_image_layers = []
@@ -199,8 +194,7 @@ class Image(object):
 
             if not squash_id:
                 raise SquashError(
-                    "The %s layer could not be found in the %s image"
-                    % (self.from_layer, self.image)
+                    f"The {self.from_layer} layer could not be found in the {self.image} image"
                 )
 
             number_of_layers = (
@@ -218,7 +212,7 @@ class Image(object):
 
         if len(self.layers_to_squash) < 1:
             raise SquashError(
-                "Invalid number of layers to squash: %s" % len(self.layers_to_squash)
+                f"Invalid number of layers to squash: {len(self.layers_to_squash)}"
             )
 
         if len(self.layers_to_squash) == 1:
@@ -309,8 +303,7 @@ class Image(object):
         if tmp_dir:
             if os.path.exists(tmp_dir):
                 raise SquashError(
-                    "The '%s' directory already exists, please remove it before you proceed"
-                    % tmp_dir
+                    f"The '{tmp_dir}' directory already exists, please remove it before you proceed"
                 )
             os.makedirs(tmp_dir)
         else:
@@ -415,10 +408,10 @@ class Image(object):
             except Exception as e:
                 self.log.exception(e)
                 self.log.warning(
-                    "An error occured while saving the %s image, retrying..." % image_id
+                    f"An error occurred while saving the {image_id} image, retrying..."
                 )
 
-        raise SquashError("Couldn't save %s image!" % image_id)
+        raise SquashError(f"Couldn't save {image_id} image!")
 
     def _unpack(self, tar_file, directory):
         """Unpacks tar archive to selected directory"""

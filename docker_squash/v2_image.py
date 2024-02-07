@@ -227,9 +227,7 @@ class V2Image(Image):
         diff_ids = []
 
         for path in self.layer_paths_to_move:
-            sha256 = self._compute_sha256(
-                self._extract_tar_name(path)
-            )
+            sha256 = self._compute_sha256(self._extract_tar_name(path))
             diff_ids.append(sha256)
 
         if self.layer_paths_to_squash:

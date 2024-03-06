@@ -220,9 +220,9 @@ class Image(object):
                 "Single layer marked to squash, no squashing is required"
             )
 
-        self.log.info("Attempting to squash last %s layers...", number_of_layers)
-        self.log.debug("Layers to squash: %s", self.layers_to_squash)
-        self.log.debug("Layers to move: %s", self.layers_to_move)
+        self.log.info(f"Attempting to squash last {number_of_layers} layers...")
+        self.log.debug(f"Layers to squash: {self.layers_to_squash}")
+        self.log.debug(f"Layers to move: {self.layers_to_move}")
 
         # Fetch the image and unpack it on the fly to the old image directory
         self._save_image(self.old_image_id, self.old_image_dir)

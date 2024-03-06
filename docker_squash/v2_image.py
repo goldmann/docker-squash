@@ -39,6 +39,9 @@ class V2Image(Image):
         if self.layer_paths_to_move:
             self.squash_id = self.layer_paths_to_move[-1]
 
+        self.log.debug(f"Layers paths to squash: {self.layer_paths_to_squash}")
+        self.log.debug(f"Layers paths to move: {self.layer_paths_to_move}")
+
     def _squash(self):
         if self.layer_paths_to_squash:
             # Prepare the directory

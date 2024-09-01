@@ -796,7 +796,7 @@ class TestIntegSquash(IntegSquash):
     def test_remove_tmp_dir_after_failure(self):
         self.caplog.set_level(logging.DEBUG, logger="cekit")
         dockerfile = """
-        FROM busybox:1.24.0
+        FROM busybox:1.36.1
         LABEL foo bar
         """
 
@@ -820,7 +820,7 @@ class TestIntegSquash(IntegSquash):
 
     def test_should_not_remove_tmp_dir_after_failure_if_development_mode_is_on(self):
         dockerfile = """
-        FROM busybox:1.24.0
+        FROM busybox:1.36.1
         LABEL foo bar
         """
 
@@ -1261,7 +1261,7 @@ class NumericValues(IntegSquash):
     @classmethod
     def setUpClass(cls):
         dockerfile = """
-        FROM busybox:1.24.0
+        FROM busybox:1.36.1
         RUN touch /tmp/test1
         RUN touch /tmp/test2
         CMD /bin/env

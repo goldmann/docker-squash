@@ -12,6 +12,7 @@ from io import BytesIO
 import docker.errors
 import mock
 import pytest
+from parameterized import parameterized
 from packaging import version as packaging_version
 
 from docker_squash.errors import SquashError, SquashUnnecessaryError
@@ -37,7 +38,7 @@ class ImageHelper(object):
 
 
 class IntegSquash(unittest.TestCase):
-    BUSYBOX_IMAGE = "busybox:1.34"
+    BUSYBOX_IMAGE = "busybox:1.36.1"
 
     log = logging.getLogger()
     handler = logging.StreamHandler()
@@ -698,7 +699,7 @@ class TestIntegSquash(IntegSquash):
         )
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(image, 2) as squashed_image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
                 self.assertEqual(len(squashed_image.layers), len(image.layers) - 1)
                 image_data_layers = [s for s in image.tarnames if "layer.tar" in s]
                 squashed_image_data_layers = [
@@ -735,7 +736,7 @@ class TestIntegSquash(IntegSquash):
         )
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(image, 2) as squashed_image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
                 self.assertEqual(len(squashed_image.layers), len(image.layers) - 1)
 
     def test_should_squash_exactly_3_layers_with_data(self):
@@ -757,9 +758,9 @@ class TestIntegSquash(IntegSquash):
         dockerfile = (
             """
         FROM %s
-        RUN touch /abc
         CMD /bin/env
         LABEL foo bar
+        RUN touch /abc
         """
             % TestIntegSquash.BUSYBOX_IMAGE
         )
@@ -1306,41 +1307,21 @@ class NumericValues(IntegSquash):
             with self.SquashedImage(NumericValues.image, 1, numeric=True):
                 pass
 
-    def test_should_squash_2_layers(self):
-        with self.SquashedImage(NumericValues.image, 2, numeric=True) as squashed_image:
-            i_h = NumericValues.image.history[0]
-            s_h = squashed_image.history[0]
+    @parameterized.expand([(2,), (3,), (4,)])
+    def test_should_squash_n_layers(self, number_of_layers):
+        with self.SquashedImage(NumericValues.image, number_of_layers, numeric=True) as squashed_image:
+            i_h = NumericValues.image.history[number_of_layers:]
+            s_h = squashed_image.history[1:]
 
-            for key in "Comment", "Size":
-                self.assertEqual(i_h[key], s_h[key])
-            self.assertEqual(s_h["CreatedBy"], "")
             self.assertEqual(
-                len(squashed_image.layers), len(NumericValues.image.layers) - 1
+                len(squashed_image.layers), len(NumericValues.image.layers) - (number_of_layers - 1)
             )
 
-    def test_should_squash_3_layers(self):
-        with self.SquashedImage(NumericValues.image, 3, numeric=True) as squashed_image:
-            i_h = NumericValues.image.history[0]
-            s_h = squashed_image.history[0]
-
-            for key in "Comment", "Size":
-                self.assertEqual(i_h[key], s_h[key])
-            self.assertEqual(s_h["CreatedBy"], "")
-            self.assertEqual(
-                len(squashed_image.layers), len(NumericValues.image.layers) - 2
-            )
-
-    def test_should_squash_4_layers(self):
-        with self.SquashedImage(NumericValues.image, 4, numeric=True) as squashed_image:
-            i_h = NumericValues.image.history[0]
-            s_h = squashed_image.history[0]
-
-            for key in "Comment", "Size":
-                self.assertEqual(i_h[key], s_h[key])
-            self.assertEqual(s_h["CreatedBy"], "")
-            self.assertEqual(
-                len(squashed_image.layers), len(NumericValues.image.layers) - 3
-            )
+            for c in range(len(i_h)):
+                for key in "CreatedBy", "Comment", "Size":
+                    self.assertEqual(s_h[c][key], i_h[c][key])
+            self.assertEqual(squashed_image.history[0]["Comment"], "")
+            self.assertEqual(squashed_image.history[0]["CreatedBy"], "")
 
 
 if __name__ == "__main__":

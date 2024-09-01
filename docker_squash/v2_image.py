@@ -16,6 +16,9 @@ class V2Image(Image):
     def _before_squashing(self):
         super(V2Image, self)._before_squashing()
 
+        # New OCI Archive format type
+        self.oci_format = True
+
         # Read old image manifest file
         self.old_image_manifest = self._get_manifest()
         self.log.debug(
@@ -375,8 +378,6 @@ class V2Image(Image):
 
     def _get_manifest(self):
         if os.path.exists(os.path.join(self.old_image_dir, "index.json")):
-            # New OCI Archive format type
-            self.oci_format = True
             # Not using index.json to extract manifest details as while the config
             # sha could be extracted via some indirection i.e.
             #

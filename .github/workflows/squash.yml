@@ -64,3 +64,30 @@ jobs:
           PV=${{ matrix.python-version }}
           echo "Running tests for Python version  $PV ( ${PV/./} )"
           make test-py"${PV/./}"
+  build-podman-3:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup
+        run: |
+          sudo apt-get update
+          pip install "tox<4.0.0" setuptools
+      - name: Info
+        run: |
+          podman version
+          podman info
+      - name: Run tests
+        run: |
+          systemctl --user start podman.socket
+          export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+          PV=${{ matrix.python-version }}
+          echo "Running tests for Python version  $PV ( ${PV/./} )"
+          make test-py"${PV/./}"

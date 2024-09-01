@@ -8,3 +8,5 @@ target
 .idea
 .venv
 docker-squash.iml
+**/image.tar
+**/tox.tar

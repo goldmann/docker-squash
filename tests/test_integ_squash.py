@@ -12,8 +12,8 @@ from io import BytesIO
 import docker.errors
 import mock
 import pytest
-from parameterized import parameterized
 from packaging import version as packaging_version
+from parameterized import parameterized
 
 from docker_squash.errors import SquashError, SquashUnnecessaryError
 from docker_squash.lib import common
@@ -1309,12 +1309,15 @@ class NumericValues(IntegSquash):
 
     @parameterized.expand([(2,), (3,), (4,)])
     def test_should_squash_n_layers(self, number_of_layers):
-        with self.SquashedImage(NumericValues.image, number_of_layers, numeric=True) as squashed_image:
+        with self.SquashedImage(
+            NumericValues.image, number_of_layers, numeric=True
+        ) as squashed_image:
             i_h = NumericValues.image.history[number_of_layers:]
             s_h = squashed_image.history[1:]
 
             self.assertEqual(
-                len(squashed_image.layers), len(NumericValues.image.layers) - (number_of_layers - 1)
+                len(squashed_image.layers),
+                len(NumericValues.image.layers) - (number_of_layers - 1),
             )
 
             for c in range(len(i_h)):

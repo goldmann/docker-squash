@@ -186,11 +186,12 @@ class Image(object):
         try:
             number_of_layers = int(self.from_layer)
 
-            self.log.debug("We detected number of layers as the argument to squash")
+            self.log.debug(
+                f"We detected number of layers ({number_of_layers}) as the argument to squash"
+            )
         except ValueError:
-            self.log.debug("We detected layer as the argument to squash")
-
             squash_id = self._squash_id(self.from_layer)
+            self.log.debug(f"We detected layer ({squash_id}) as the argument to squash")
 
             if not squash_id:
                 raise SquashError(

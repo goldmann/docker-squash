@@ -143,8 +143,11 @@ class Squash(object):
             # Load squashed image into Docker
             image.load_squashed_image()
 
-        # Clean up all temporary files
-        image.cleanup()
+        # If development mode is not enabled, make sure we clean up the
+        # temporary directory
+        if not self.development:
+            # Clean up all temporary files
+            image.cleanup()
 
         # Remove the source image - this is the only possible way
         # to remove orphaned layers from Docker daemon at the build time.

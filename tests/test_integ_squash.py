@@ -304,6 +304,14 @@ class IntegSquash(unittest.TestCase):
                     tar.getnames(),
                 )
 
+        def assertContentEquals(self, name, expected):
+            self.content.seek(0)  # Rewind
+            with tarfile.open(fileobj=self.content, mode="r") as tar:
+                content = tar.extractfile(name)
+                assert content.read() == expected, (
+                    "File %s has different content than expected" % name
+                )
+
 
 class TestIntegSquash(IntegSquash):
     @pytest.fixture(autouse=True)
@@ -331,7 +339,7 @@ class TestIntegSquash(IntegSquash):
         FROM %s
         RUN touch /somefile_layer1
         RUN touch /somefile_layer2
-        RUN touch /somefile_layer3
+        RUN echo text > /somefile_layer3
         """ % TestIntegSquash.BUSYBOX_IMAGE
 
         with self.Image(dockerfile) as image:
@@ -347,6 +355,7 @@ class TestIntegSquash(IntegSquash):
                     container.assertFileExists("somefile_layer1")
                     container.assertFileExists("somefile_layer2")
                     container.assertFileExists("somefile_layer3")
+                    container.assertContentEquals("somefile_layer3", b"text\n")
 
                     # We should have two layers less in the image
                     self.assertTrue(len(squashed_image.layers) == len(image.layers) - 2)
@@ -409,6 +418,24 @@ class TestIntegSquash(IntegSquash):
 
                     # We should have one layer less in the image
                     self.assertEqual(len(squashed_image.layers), len(image.layers) - 1)
+
+    def test_there_should_not_be_a_marker_file(self):
+        dockerfile = """
+        FROM %s
+        RUN touch /somefile_layer1
+        RUN rm /somefile_layer1
+        RUN touch /somefile_layer3
+        """ % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 3) as squashed_image:
+                squashed_image.assertFileDoesNotExist("somefile_layer1")
+                squashed_image.assertFileExists("somefile_layer3")
+                squashed_image.assertFileDoesNotExist(".wh.somefile_layer1")
+
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists("somefile_layer3")
+                    container.assertFileDoesNotExist("somefile_layer1")
 
     def test_there_should_be_a_marker_file_in_the_squashed_layer_even_more_complex(
         self,
@@ -1059,6 +1086,36 @@ class TestIntegSquash(IntegSquash):
                     container.assertFileExists("tmp/dir")
                     container.assertFileDoesNotExist("tmp/dir/file")
 
+    def test_should_handle_replacing_directory(self):
+        dockerfile = """
+        FROM %s
+        RUN mkdir /tmp/dir
+        RUN touch /tmp/dir/file
+        RUN rm -rf /tmp/dir ; touch /tmp/dir
+        """ % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 3, numeric=True) as squashed_image:
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists("tmp/dir")
+                    container.assertFileDoesNotExist("tmp/dir/file")
+
+    def test_should_handle_replacing_directory_containing_markers(self):
+        dockerfile = """
+        FROM %s
+        RUN mkdir /tmp/dir
+        RUN touch /tmp/dir/file
+        RUN rm /tmp/dir/file
+        RUN rm -rf /tmp/dir ; touch /tmp/dir
+        """ % TestIntegSquash.BUSYBOX_IMAGE
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, 2, numeric=True) as squashed_image:
+                squashed_image.assertFileDoesNotExist("tmp/dir/.wh.file")
+                with self.Container(squashed_image) as container:
+                    container.assertFileExists("tmp/dir")
+                    container.assertFileDoesNotExist("tmp/dir/file")
+
     # https://github.com/goldmann/docker-squash/issues/122
     def test_should_not_add_duplicate_files(self):
         dockerfile = """
@@ -1077,9 +1134,7 @@ class TestIntegSquash(IntegSquash):
         """.format(TestIntegSquash.BUSYBOX_IMAGE)
 
         with self.Image(dockerfile) as image:
-            with self.SquashedImage(
-                image, 6, numeric=True, output_path="tox.tar"
-            ) as squashed_image:
+            with self.SquashedImage(image, 6, numeric=True) as squashed_image:
                 with self.Container(squashed_image) as container:
                     container.assertFileExists(
                         "data-template/etc/systemd/system/container-ipa.target.wants"

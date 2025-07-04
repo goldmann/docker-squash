@@ -11,8 +11,7 @@ class TestReadingConfigFiles(unittest.TestCase):
     def setUp(self):
         self.docker_client = mock.Mock()
         self.log = mock.Mock()
-        self.image = "whatever"
-        self.image = V2Image(self.log, self.docker_client, self.image, None)
+        self.image = V2Image(self.log, self.docker_client, "whatever", None)
 
     def test_should_read_json_file(self):
         manifest_example = '[{"Config":"96bdd3be20fa51b22dc9aaf996b49d403a403adf96e35d7e8b98519267c21c21.json","RepoTags":["busybox-to-squash:squashed"],"Layers":["980a6c63f88351bea42851fc101e4e2f61b12e1bf70122aad1f25186a736a404/layer.tar","977b2156300ec11226ffc7f9382e2fe4ec10a9cdfe445e062542b430aa09d82d/layer.tar","8a646a2ab402ca2774063c602182ad22c09d4af236ed84bdddb6d1205309accf/layer.tar"]}]'
@@ -47,8 +46,7 @@ class TestGeneratingMetadata(unittest.TestCase):
     def setUp(self):
         self.docker_client = mock.Mock()
         self.log = mock.Mock()
-        self.image = "whatever"
-        self.image = V2Image(self.log, self.docker_client, self.image, None)
+        self.image = V2Image(self.log, self.docker_client, "whatever", None)
 
     def test_generate_manifest(self):
         old_image_manifest = {
@@ -238,8 +236,7 @@ class TestWritingMetadata(unittest.TestCase):
     def setUp(self):
         self.docker_client = mock.Mock()
         self.log = mock.Mock()
-        self.image = "whatever"
-        self.image = V2Image(self.log, self.docker_client, self.image, None)
+        self.image = V2Image(self.log, self.docker_client, "whatever", None)
 
     @mock.patch.object(V2Image, "_write_json_metadata")
     def test_write_image_metadata(self, mock_method):

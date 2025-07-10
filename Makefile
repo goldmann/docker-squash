@@ -3,9 +3,6 @@ CIRCLE_NODE_INDEX ?= 0
 test: prepare
 	tox -- tests
 
-test-py36: prepare
-	tox -e py36 -- tests
-
 test-py37: prepare
 	tox -e py37 -- tests
 
@@ -23,6 +20,9 @@ test-py311: prepare
 
 test-py312: prepare
 	tox -e py312 -- tests
+
+test-py313: prepare
+	tox -e py313 -- tests
 
 test-unit: prepare
 	tox -- tests/test_unit*

@@ -70,7 +70,13 @@ class CLI(object):
             "--version", action="version", help="Show version and exit", version=version
         )
 
-        parser.add_argument("image", help="Image to be squashed")
+        parser.add_argument("image", nargs="?", help="Image to be squashed")
+
+        parser.add_argument(
+            "--input-tar",
+            help="Path to tar file created by 'docker save'. Process tar file directly without requiring Docker daemon.",
+        )
+
         parser.add_argument(
             "-f",
             "--from-layer",
@@ -79,7 +85,7 @@ class CLI(object):
         parser.add_argument(
             "-t",
             "--tag",
-            help="Specify the tag to be used for the new image. If not specified no tag will be applied",
+            help="Specify the tag to be used for the squashed image (recommended). Without this, the squashed image will have no repository tags to avoid overwriting the original image.",
         )
         parser.add_argument(
             "-m",
@@ -112,24 +118,27 @@ class CLI(object):
 
         args = parser.parse_args()
 
+        if not args.input_tar and not args.image:
+            parser.error("Either 'image' or '--input-tar' must be specified")
+
+        if args.input_tar and args.image:
+            parser.error(
+                "Cannot specify both 'image' and '--input-tar' at the same time"
+            )
+
         if args.verbose:
             self.log.setLevel(logging.DEBUG)
         else:
             self.log.setLevel(logging.INFO)
 
         self.log.debug("Running version %s", version)
+
         try:
-            squash.Squash(
-                log=self.log,
-                image=args.image,
-                from_layer=args.from_layer,
-                tag=args.tag,
-                comment=args.message,
-                output_path=args.output_path,
-                load_image=args.load_image,
-                tmp_dir=args.tmp_dir,
-                cleanup=args.cleanup,
-            ).run()
+            if args.input_tar:
+                self._run_tar_mode(args)
+            else:
+                self._run_image_mode(args)
+
         except KeyboardInterrupt:
             self.log.error("Program interrupted by user, exiting...")
             sys.exit(1)
@@ -149,6 +158,67 @@ class CLI(object):
                 sys.exit(e.code)
 
             sys.exit(1)
+
+    def _run_tar_mode(self, args):
+        from docker_squash.tar_image import TarImage
+
+        # Provide helpful guidance about --tag parameter
+        if not args.tag:
+            self.log.info(
+                "💡 Tip: Consider using --tag to specify a name for your squashed image"
+            )
+            self.log.info("   Example: --tag myimage:squashed")
+
+        tar_image = TarImage(
+            log=self.log,
+            tar_path=args.input_tar,
+            from_layer=args.from_layer,
+            tmp_dir=args.tmp_dir,
+            tag=args.tag,
+            comment=args.message,
+        )
+
+        try:
+            new_image_id = tar_image.squash()
+            self.log.info("New squashed image ID is %s" % new_image_id)
+
+            if args.output_path:
+                tar_image.export_tar_archive(args.output_path)
+
+            if args.load_image:
+                tar_image.load_squashed_image()
+
+            if not args.output_path and not args.load_image:
+                import os
+                import tempfile
+
+                temp_output = os.path.join(
+                    tempfile.gettempdir(), f"squashed-{new_image_id[:12]}.tar"
+                )
+                tar_image.export_tar_archive(temp_output)
+                self.log.info(
+                    "Since no output path was specified and loading to Docker was disabled, "
+                    f"the squashed image has been saved to: {temp_output}"
+                )
+
+            self.log.info("Done")
+
+        finally:
+            if not args.tmp_dir:
+                tar_image.cleanup()
+
+    def _run_image_mode(self, args):
+        squash.Squash(
+            log=self.log,
+            image=args.image,
+            from_layer=args.from_layer,
+            tag=args.tag,
+            comment=args.message,
+            output_path=args.output_path,
+            load_image=args.load_image,
+            tmp_dir=args.tmp_dir,
+            cleanup=args.cleanup,
+        ).run()
 
 
 def run():

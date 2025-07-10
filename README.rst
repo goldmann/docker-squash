@@ -216,3 +216,85 @@ Let's confirm the image structure now:
     6ee235cf4473        3 weeks ago         /bin/sh -c #(nop) LABEL name=CentOS Base Imag   0 B
     474c2ee77fa3        3 weeks ago         /bin/sh -c #(nop) ADD file:72852fc7626d233343   196.6 MB
     1544084fad81        6 months ago        /bin/sh -c #(nop) MAINTAINER The CentOS Proje   0 B
+
+Working without Docker daemon
+-----------------------------
+
+Sometimes you may want to squash an image without direct access to Docker daemon (e.g., in CI/CD pipelines, 
+air-gapped environments, or when Docker is not running). The ``--input-tar`` parameter allows you to process 
+Docker images exported as tar files without requiring a Docker daemon connection.
+
+**Step 1**: Export the image to a tar file using ``docker save``:
+
+::
+
+    $ docker save -o source.tar jboss/wildfly:latest
+
+**Step 2**: Squash the image from the tar file. Let's squash the last 8 layers:
+
+::
+
+    $ python -m docker_squash.cli --input-tar source.tar --tag jboss/wildfly:squashed -f 8 --output-path squashed.tar --load-image false
+    2025-07-04 06:14:01,649 tar_image.py:83         INFO  Extracting tar image from source.tar
+    2025-07-04 06:14:01,918 tar_image.py:102        INFO  Detected OCI format image
+    2025-07-04 06:14:01,919 tar_image.py:254        INFO  Preparing for squashing...
+    2025-07-04 06:14:01,919 tar_image.py:259        INFO  Old image has 22 layers
+    2025-07-04 06:14:01,919 tar_image.py:305        INFO  Will squash 8 layers
+    2025-07-04 06:14:01,919 tar_image.py:313        INFO  Starting squashing process...
+    2025-07-04 06:14:01,919 image.py:750        INFO  Starting squashing for /tmp/docker-squash-1strl2rh/new/squashed/layer.tar...
+    2025-07-04 06:14:04,001 image.py:775        INFO  Squashing file '/tmp/docker-squash-1strl2rh/old/blobs/sha256/f26d32e28c292aba76defcdd67c267000d31a6ac3ebdab5c850aba90ef834927'...
+    2025-07-04 06:14:05,284 image.py:923        INFO  Squashing finished!
+    2025-07-04 06:14:06,202 tar_image.py:632        WARNING OCI output format not fully implemented - creating Docker format
+    2025-07-04 06:14:06,202 tar_image.py:558        INFO  Using user-specified tag: jboss/wildfly:squashed
+    2025-07-04 06:14:06,277 tar_image.py:352        INFO  Squashing completed successfully
+    2025-07-04 06:14:06,277 tar_image.py:362        INFO  Original image size: 382.24 MB
+    2025-07-04 06:14:06,277 tar_image.py:363        INFO  Squashed image size: 421.60 MB
+    2025-07-04 06:14:06,277 tar_image.py:366        INFO  If the squashed image is larger than original it means that there were no meaningful files to squash and it just added metadata. Are you sure you specified correct parameters?
+    2025-07-04 06:14:06,277 cli.py:179        INFO  New squashed image ID is sha256:dbde9a2e59a3975663b55773510f36c14b5046f4ef26a84f84445d406124772d
+    2025-07-04 06:14:06,277 tar_image.py:732        INFO  Exporting squashed image to squashed.tar
+    2025-07-04 06:14:07,544 tar_image.py:742        INFO  Export completed successfully
+    2025-07-04 06:14:07,544 cli.py:195        INFO  Done
+
+**Step 3**: Load the squashed image back into Docker:
+
+::
+
+    $ docker load -i squashed.tar
+    Loaded image: jboss/wildfly:squashed
+
+Now you can verify the squashed image structure:
+
+::
+
+    $ docker history jboss/wildfly:squashed
+    IMAGE          CREATED          CREATED BY                                      SIZE      COMMENT
+    9d47ef6da59f   41 seconds ago                                                   270MB     Squashed layers
+    <missing>      3 years ago      /bin/sh -c #(nop)  ENV WILDFLY_VERSION=25.0.…   0B        
+    <missing>      4 years ago      /bin/sh -c #(nop)  ENV JAVA_HOME=/usr/lib/jv…   0B        
+    <missing>      4 years ago      /bin/sh -c #(nop)  USER jboss                   0B        
+    <missing>      4 years ago      /bin/sh -c yum -y install java-11-openjdk-de…   239MB     
+    <missing>      4 years ago      /bin/sh -c #(nop)  USER root                    0B        
+    <missing>      4 years ago      /bin/sh -c #(nop)  MAINTAINER Marek Goldmann…   0B        
+    <missing>      4 years ago      /bin/sh -c #(nop)  USER jboss                   0B        
+    <missing>      4 years ago      /bin/sh -c #(nop) WORKDIR /opt/jboss            0B        
+    <missing>      4 years ago      /bin/sh -c groupadd -r jboss -g 1000 && user…   406kB     
+    <missing>      4 years ago      /bin/sh -c yum update -y && yum -y install x…   33.5MB    
+    <missing>      4 years ago      /bin/sh -c #(nop)  MAINTAINER Marek Goldmann…   0B        
+    <missing>      4 years ago      /bin/sh -c #(nop)  CMD ["/bin/bash"]            0B        
+    <missing>      4 years ago      /bin/sh -c #(nop)  LABEL org.label-schema.sc…   0B        
+    <missing>      4 years ago      /bin/sh -c #(nop) ADD file:61908381d3142ffba…   222MB     
+
+**Key advantages of tar mode:**
+
+- No Docker daemon required during squashing
+- Works in CI/CD pipelines and restricted environments  
+- Supports both Docker format and OCI format images
+- Maintains complete layer history compatibility
+- Can process images on systems where Docker is not installed
+
+**Important notes:**
+
+- Always use ``--tag`` parameter to avoid overwriting the original image name
+- Set ``--load-image false`` if you only want to export the squashed tar file  
+- Use ``--output-path`` to specify where the squashed tar should be saved
+- The tool automatically detects image format (Docker vs OCI) from the input tar

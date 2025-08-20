@@ -20,63 +20,34 @@ class TarImage(Image):
     def __init__(
         self, log, tar_path, from_layer=None, tmp_dir=None, tag=None, comment=""
     ):
+        # Call parent constructor with adapted parameters
+        super().__init__(
+            log=log,
+            docker=None,  # TarImage doesn't need Docker client
+            image=tar_path,  # Use tar_path as image identifier
+            from_layer=from_layer,
+            tmp_dir=tmp_dir,
+            tag=tag,
+            comment=comment,
+        )
+
+        # TarImage specific attributes
         self.tar_path = tar_path
-        self.log = log
-        self.debug = self.log.isEnabledFor(logging.DEBUG)
-        self.from_layer = from_layer
-        self.tag = tag
-        self.comment = comment
-        self.tmp_dir = self._prepare_tmp_directory(tmp_dir)
-        self.date = self._get_current_date()
 
-        # Initialize attributes required by base class
-        self.image_name = None
-        self.image_tag = None
-        self.squash_id = None
-        self.oci_format = False
+        # *** Critical: Initialize directories immediately as subsequent operations require them ***
+        self._initialize_directories()
 
-        # Set up directory structure
-        self.old_image_dir = os.path.join(self.tmp_dir, "old")
-        self.new_image_dir = os.path.join(self.tmp_dir, "new")
-        self.squashed_dir = os.path.join(self.new_image_dir, "squashed")
-
-        # Ensure directories exist
-        os.makedirs(self.old_image_dir, exist_ok=True)
-        os.makedirs(self.new_image_dir, exist_ok=True)
-        os.makedirs(self.squashed_dir, exist_ok=True)
-
-        # Initialize variables
+        # Initialize TarImage specific variables
         self.manifest = None
         self.old_image_config = None
-        self.old_image_layers = []
         self.original_image_name = None
-        self.old_image_id = None
+        self.old_image_layers = []  # This also needs initialization
 
-        # Parse image name if provided
-        if self.tag:
-            self.image_name, self.image_tag = self._parse_image_name(self.tag)
-
-        # Process the tar file
+        # Process tar file (TarImage specific logic)
         self._extract_tar_image()
         self._detect_image_format()
         self._load_image_metadata()
         self.size_before = self._dir_size(self.old_image_dir)
-
-    def squash(self):
-        """Main squash method - follows base class pattern"""
-        self._before_squashing()
-        ret = self._squash()
-        self._after_squashing()
-        return ret
-
-    def _get_current_date(self):
-        """Get current date in Docker format"""
-        import datetime
-        import re
-
-        # Workaround for Golang microsecond formatting
-        date = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        return re.sub(r"0*Z$", "Z", date)
 
     def _extract_tar_image(self):
         """Extract tar image to temporary directory"""
@@ -263,64 +234,72 @@ class TarImage(Image):
 
     def _before_squashing(self):
         """Prepare for squashing operation"""
-        self.log.info("Preparing for squashing...")
+        # No need to call _initialize_directories() as it's already called in constructor
 
-        # Ensure we have image layers
-        if not self.old_image_layers:
-            raise SquashError("No layers found in image")
+        # Location of the tar archive with squashed layers
+        self.squashed_tar = os.path.join(self.squashed_dir, "layer.tar")
+
+        # Handle tags if provided
+        if self.tag:
+            self.image_name, self.image_tag = self._parse_image_name(self.tag)
+
+        # TarImage specific: Ensure we have necessary layer information
+        if not hasattr(self, "old_image_layers") or not self.old_image_layers:
+            raise SquashError("No layers found in tar image")
+
+        # *** Important: Copy layer calculation logic from base class ***
         self.log.info("Old image has %s layers", len(self.old_image_layers))
-        # Set up squashing parameters
+        self.log.debug("Old layers: %s", self.old_image_layers)
+
+        # By default - squash all layers.
         if self.from_layer is None:
             self.from_layer = len(self.old_image_layers)
 
         try:
             number_of_layers = int(self.from_layer)
-            self.log.debug(f"Squashing last {number_of_layers} layers")
-        except ValueError:
-            # Handle layer ID as from_layer
-            if self.from_layer in self.old_image_layers:
-                layer_index = self.old_image_layers.index(self.from_layer)
-                number_of_layers = len(self.old_image_layers) - layer_index - 1
-            else:
-                raise SquashError(f"Layer {self.from_layer} not found in image")
-
-        if number_of_layers <= 0:
-            raise SquashError("Number of layers to squash must be positive")
-
-        if number_of_layers > len(self.old_image_layers):
-            raise SquashError(
-                f"Cannot squash {number_of_layers} layers from {len(self.old_image_layers)} total layers"
+            self.log.debug(
+                f"We detected number of layers ({number_of_layers}) as the argument to squash"
             )
+        except ValueError:
+            # For TarImage, we need to adapt this logic
+            # because we don't have Docker client to check layer IDs
+            if self.from_layer in self.old_image_layers:
+                number_of_layers = (
+                    len(self.old_image_layers)
+                    - self.old_image_layers.index(self.from_layer)
+                    - 1
+                )
+            else:
+                raise SquashError(
+                    f"The {self.from_layer} layer could not be found in the image"
+                )
+
+        self._validate_number_of_layers(number_of_layers)
 
         marker = len(self.old_image_layers) - number_of_layers
+
         self.layers_to_squash = self.old_image_layers[marker:]
         self.layers_to_move = self.old_image_layers[:marker]
 
-        if len(self.layers_to_squash) <= 1:
-            raise SquashError("Need at least 2 layers to squash")
+        self.log.info("Checking if squashing is necessary...")
 
-        # Set squash_id like v2_image.py does - should be the last real (non-virtual) layer to move
-        self.squash_id = None
-        if self.layers_to_move:
-            # Find the last non-virtual layer in layers_to_move
-            for layer_id in reversed(self.layers_to_move):
-                if not layer_id.startswith("<missing-"):
-                    self.squash_id = layer_id
-                    break
+        if len(self.layers_to_squash) < 1:
+            raise SquashError(
+                f"Invalid number of layers to squash: {len(self.layers_to_squash)}"
+            )
 
-            if self.squash_id is None:
-                # All layers_to_move are virtual, no squash_id
-                self.log.debug("All layers to move are virtual - no squash_id set")
+        if len(self.layers_to_squash) == 1:
+            from docker_squash.errors import SquashUnnecessaryError
 
-        # Set layer_paths for compatibility with v2_image.py patterns
-        self.layer_paths_to_squash = self.layers_to_squash.copy()
-        self.layer_paths_to_move = self.layers_to_move.copy()
+            raise SquashUnnecessaryError(
+                "Single layer marked to squash, no squashing is required"
+            )
 
-        self.log.info(f"Will squash {len(self.layers_to_squash)} layers")
+        self.log.info(f"Attempting to squash last {number_of_layers} layers...")
         self.log.debug(f"Layers to squash: {self.layers_to_squash}")
         self.log.debug(f"Layers to move: {self.layers_to_move}")
-        if hasattr(self, "squash_id"):
-            self.log.debug(f"Squash ID: {self.squash_id}")
+
+        # TarImage doesn't need _save_image as data is already extracted in constructor
 
     def _squash(self):
         """Perform the actual squashing"""
@@ -788,7 +767,7 @@ class TarImage(Image):
 
         with tarfile.open(output_path, "w") as tar:
             # Add all files from new_image_dir
-            for root, dirs, files in os.walk(self.new_image_dir):
+            for root, _, files in os.walk(self.new_image_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
                     arcname = os.path.relpath(file_path, self.new_image_dir)
@@ -801,29 +780,16 @@ class TarImage(Image):
         try:
             from docker_squash.lib import common
 
-            docker = common.docker_client(self.log)
+            self.docker = common.docker_client(self.log)
 
-            # Create a temporary tar file for loading
-            import tempfile
+            # Load directly from new_image_dir without creating temporary files
+            self.log.info("Loading squashed image into Docker daemon...")
 
-            with tempfile.NamedTemporaryFile(suffix=".tar", delete=False) as temp_file:
-                temp_tar_path = temp_file.name
+            # Use base class _load_image method
 
-            try:
-                # Export the squashed image to temporary tar
-                self.export_tar_archive(temp_tar_path)
+            self._load_image(self.new_image_dir)
 
-                # Load into Docker
-                self.log.info("Loading squashed image into Docker daemon...")
-                with open(temp_tar_path, "rb") as f:
-                    docker.load_image(f)
-
-                self.log.info("Image loaded successfully")
-
-            finally:
-                # Clean up temporary file
-                if os.path.exists(temp_tar_path):
-                    os.unlink(temp_tar_path)
+            self.log.info("Image loaded successfully")
 
         except ImportError:
             self.log.warning(

@@ -70,11 +70,9 @@ class CLI(object):
             "--version", action="version", help="Show version and exit", version=version
         )
 
-        parser.add_argument("image", nargs="?", help="Image to be squashed")
-
         parser.add_argument(
-            "--input-tar",
-            help="Path to tar file created by 'docker save'. Process tar file directly without requiring Docker daemon.",
+            "image",
+            help="Image name or tar file path to be squashed. If a .tar file is provided, it will be processed without requiring Docker daemon.",
         )
 
         parser.add_argument(
@@ -118,14 +116,6 @@ class CLI(object):
 
         args = parser.parse_args()
 
-        if not args.input_tar and not args.image:
-            parser.error("Either 'image' or '--input-tar' must be specified")
-
-        if args.input_tar and args.image:
-            parser.error(
-                "Cannot specify both 'image' and '--input-tar' at the same time"
-            )
-
         if args.verbose:
             self.log.setLevel(logging.DEBUG)
         else:
@@ -134,9 +124,12 @@ class CLI(object):
         self.log.debug("Running version %s", version)
 
         try:
-            if args.input_tar:
+            # Auto-detect if input is tar file or image name
+            if self._is_tar_file(args.image):
+                self.log.debug(f"Detected tar file: {args.image}")
                 self._run_tar_mode(args)
             else:
+                self.log.debug(f"Detected image name: {args.image}")
                 self._run_image_mode(args)
 
         except KeyboardInterrupt:
@@ -171,7 +164,7 @@ class CLI(object):
 
         tar_image = TarImage(
             log=self.log,
-            tar_path=args.input_tar,
+            tar_path=args.image,  # 这里改为 args.image
             from_layer=args.from_layer,
             tmp_dir=args.tmp_dir,
             tag=args.tag,
@@ -182,24 +175,18 @@ class CLI(object):
             new_image_id = tar_image.squash()
             self.log.info("New squashed image ID is %s" % new_image_id)
 
+            if not args.output_path:
+                import os
+
+                self.output_path = os.path.join(
+                    os.path.dirname(args.image), f"squashed-{new_image_id[:12]}.tar"
+                )
+
             if args.output_path:
                 tar_image.export_tar_archive(args.output_path)
 
             if args.load_image:
                 tar_image.load_squashed_image()
-
-            if not args.output_path and not args.load_image:
-                import os
-                import tempfile
-
-                temp_output = os.path.join(
-                    tempfile.gettempdir(), f"squashed-{new_image_id[:12]}.tar"
-                )
-                tar_image.export_tar_archive(temp_output)
-                self.log.info(
-                    "Since no output path was specified and loading to Docker was disabled, "
-                    f"the squashed image has been saved to: {temp_output}"
-                )
 
             self.log.info("Done")
 
@@ -219,6 +206,36 @@ class CLI(object):
             tmp_dir=args.tmp_dir,
             cleanup=args.cleanup,
         ).run()
+
+    def _is_tar_file(self, input_path):
+        """Detect if input is a tar file or image name"""
+        import os
+        import tarfile
+
+        # Check if it's a file path that exists
+        if os.path.isfile(input_path):
+            # Check if it's a valid tar file
+            try:
+                with tarfile.open(input_path, "r"):
+                    return True
+            except (tarfile.TarError, OSError):
+                return False
+
+        # Check if it ends with .tar extension
+        if input_path.endswith((".tar", ".tar.gz", ".tgz")):
+            return True
+
+        # Check for obvious file path patterns
+        if (
+            input_path.startswith(("/"))  # Absolute path
+            or input_path.startswith(("./"))  # Current dir
+            or input_path.startswith(("../"))  # Parent dir
+            or input_path.startswith(("~/"))
+        ):  # Home dir
+            return True
+
+        # Otherwise assume it's an image name (even if it contains '/')
+        return False
 
 
 def run():

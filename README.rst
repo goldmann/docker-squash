@@ -238,7 +238,7 @@ Note: The tool automatically detects that ``source.tar`` is a tar file and proce
 
 ::
 
-    $ docker-squash source.tar --tag jboss/wildfly:squashed -f 10 --output-path squashed.tar --load-image false 
+    $ docker-squash --tag jboss/wildfly:squashed -f 10 --output-path squashed.tar --load-image false source.tar 
     2025-08-20 07:58:45,338 tar_image.py:54         INFO  Extracting tar image from source.tar
     2025-08-20 07:58:45,598 tar_image.py:73         INFO  Detected OCI format image
     2025-08-20 07:58:45,599 tar_image.py:251        INFO  Old image has 22 layers

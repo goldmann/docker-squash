@@ -113,7 +113,37 @@ class TarImage(Image):
                 raise SquashError(f"Manifest blob not found: {manifest_path}")
 
         with open(manifest_path, "r") as f:
-            self.manifest = json.load(f, object_pairs_hook=OrderedDict)
+            manifest = json.load(f, object_pairs_hook=OrderedDict)
+
+        # Check if this is another index (nested structure)
+        if manifest.get("mediaType") == "application/vnd.oci.image.index.v1+json":
+            # This is a nested index, get the actual manifest
+            if not manifest.get("manifests"):
+                raise SquashError("No manifests found in nested index")
+
+            nested_manifest_desc = manifest["manifests"][0]
+            nested_manifest_digest = nested_manifest_desc["digest"]
+            nested_manifest_path = os.path.join(
+                self.old_image_dir,
+                "blobs",
+                "sha256",
+                nested_manifest_digest.split(":")[1],
+            )
+
+            if not os.path.exists(nested_manifest_path):
+                raise SquashError(
+                    f"Nested manifest blob not found: {nested_manifest_path}"
+                )
+
+            with open(nested_manifest_path, "r") as f:
+                self.manifest = json.load(f, object_pairs_hook=OrderedDict)
+        else:
+            # This is a direct manifest
+            self.manifest = manifest
+
+        # Now check for config field
+        if "config" not in self.manifest:
+            raise SquashError("No config found in manifest - invalid OCI image")
 
         # Read config blob
         config_desc = self.manifest["config"]

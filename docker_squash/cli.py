@@ -70,7 +70,11 @@ class CLI(object):
             "--version", action="version", help="Show version and exit", version=version
         )
 
-        parser.add_argument("image", help="Image to be squashed")
+        parser.add_argument(
+            "image",
+            help="Image name or tar file path to be squashed. If a .tar file is provided, it will be processed without requiring Docker daemon.",
+        )
+
         parser.add_argument(
             "-f",
             "--from-layer",
@@ -79,7 +83,7 @@ class CLI(object):
         parser.add_argument(
             "-t",
             "--tag",
-            help="Specify the tag to be used for the new image. If not specified no tag will be applied",
+            help="Specify the tag to be used for the squashed image (recommended). Without this, the squashed image will have no repository tags to avoid overwriting the original image.",
         )
         parser.add_argument(
             "-m",
@@ -118,18 +122,16 @@ class CLI(object):
             self.log.setLevel(logging.INFO)
 
         self.log.debug("Running version %s", version)
+
         try:
-            squash.Squash(
-                log=self.log,
-                image=args.image,
-                from_layer=args.from_layer,
-                tag=args.tag,
-                comment=args.message,
-                output_path=args.output_path,
-                load_image=args.load_image,
-                tmp_dir=args.tmp_dir,
-                cleanup=args.cleanup,
-            ).run()
+            # Auto-detect if input is tar file or image name
+            if self._is_tar_file(args.image):
+                self.log.debug(f"Detected tar file: {args.image}")
+                self._run_tar_mode(args)
+            else:
+                self.log.debug(f"Detected image name: {args.image}")
+                self._run_image_mode(args)
+
         except KeyboardInterrupt:
             self.log.error("Program interrupted by user, exiting...")
             sys.exit(1)
@@ -149,6 +151,91 @@ class CLI(object):
                 sys.exit(e.code)
 
             sys.exit(1)
+
+    def _run_tar_mode(self, args):
+        from docker_squash.tar_image import TarImage
+
+        # Provide helpful guidance about --tag parameter
+        if not args.tag:
+            self.log.info(
+                "💡 Tip: Consider using --tag to specify a name for your squashed image"
+            )
+            self.log.info("   Example: --tag myimage:squashed")
+
+        tar_image = TarImage(
+            log=self.log,
+            tar_path=args.image,  # 这里改为 args.image
+            from_layer=args.from_layer,
+            tmp_dir=args.tmp_dir,
+            tag=args.tag,
+            comment=args.message,
+        )
+
+        try:
+            new_image_id = tar_image.squash()
+            self.log.info("New squashed image ID is %s" % new_image_id)
+
+            if not args.output_path:
+                import os
+
+                self.output_path = os.path.join(
+                    os.path.dirname(args.image), f"squashed-{new_image_id[:12]}.tar"
+                )
+
+            if args.output_path:
+                tar_image.export_tar_archive(args.output_path)
+
+            if args.load_image:
+                tar_image.load_squashed_image()
+
+            self.log.info("Done")
+
+        finally:
+            if not args.tmp_dir:
+                tar_image.cleanup()
+
+    def _run_image_mode(self, args):
+        squash.Squash(
+            log=self.log,
+            image=args.image,
+            from_layer=args.from_layer,
+            tag=args.tag,
+            comment=args.message,
+            output_path=args.output_path,
+            load_image=args.load_image,
+            tmp_dir=args.tmp_dir,
+            cleanup=args.cleanup,
+        ).run()
+
+    def _is_tar_file(self, input_path):
+        """Detect if input is a tar file or image name"""
+        import os
+        import tarfile
+
+        # Check if it's a file path that exists
+        if os.path.isfile(input_path):
+            # Check if it's a valid tar file
+            try:
+                with tarfile.open(input_path, "r"):
+                    return True
+            except (tarfile.TarError, OSError):
+                return False
+
+        # Check if it ends with .tar extension
+        if input_path.endswith((".tar", ".tar.gz", ".tgz")):
+            return True
+
+        # Check for obvious file path patterns
+        if (
+            input_path.startswith(("/"))  # Absolute path
+            or input_path.startswith(("./"))  # Current dir
+            or input_path.startswith(("../"))  # Parent dir
+            or input_path.startswith(("~/"))
+        ):  # Home dir
+            return True
+
+        # Otherwise assume it's an image name (even if it contains '/')
+        return False
 
 
 def run():

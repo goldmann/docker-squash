@@ -10,3 +10,7 @@ target
 docker-squash.iml
 **/image.tar
 **/tox.tar
+
+.cursor/*
+
+*.tar

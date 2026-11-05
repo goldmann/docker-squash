@@ -274,14 +274,21 @@ class Image(object):
         self._tar_image(target_tar_file, self.new_image_dir)
         self.log.info("Image available at '%s'" % target_tar_file)
 
-    def load_squashed_image(self):
-        self._load_image(self.new_image_dir)
+    def load_squashed_image(self) -> Optional[str]:
+        """
+        Loads the squashed image into the daemon and returns the image ID
+        assigned by the daemon (without the 'sha256:' prefix), or None if it
+        could not be determined.
+        """
+        image_id = self._load_image(self.new_image_dir)
 
         if self.tag:
             self.log.info(
                 "Image registered in Docker daemon as %s:%s"
                 % (self.image_name, self.image_tag)
             )
+
+        return image_id
 
     def _files_in_layers(self, layers):
         """
@@ -314,17 +321,55 @@ class Image(object):
 
         return tmp_dir
 
-    def _load_image(self, directory):
+    def _load_image(self, directory) -> Optional[str]:
         tar_file = os.path.join(self.tmp_dir, "image.tar")
 
         self._tar_image(tar_file, directory)
 
+        loaded_id = None
+        loaded_ref = None
+
         with open(tar_file, "rb") as f:
             self.log.debug("Loading squashed image...")
-            self.docker.load_image(f)
+            for message in self.docker.load_image(f) or []:
+                self.log.debug("Load reply: %s" % message)
+
+                if not isinstance(message, dict):
+                    continue
+
+                if message.get("error") or message.get("errorDetail"):
+                    raise SquashError(
+                        "Docker daemon failed to load the squashed image: %s"
+                        % (message.get("error") or message.get("errorDetail"))
+                    )
+
+                stream = message.get("stream", "")
+
+                match = re.search(r"Loaded image ID: (\S+)", stream)
+                if match:
+                    loaded_id = match.group(1)
+                    continue
+
+                match = re.search(r"Loaded image: (\S+)", stream)
+                if match:
+                    loaded_ref = match.group(1)
+
             self.log.debug("Image loaded!")
 
         os.remove(tar_file)
+
+        if loaded_id is None and loaded_ref is not None:
+            try:
+                loaded_id = self.docker.inspect_image(loaded_ref)["Id"]
+            except Exception as ex:
+                self.log.warning(
+                    "Could not inspect loaded image %s: %s" % (loaded_ref, ex)
+                )
+
+        if loaded_id is None:
+            return None
+
+        return loaded_id.replace("sha256:", "")
 
     def _tar_image(self, target_tar_file, directory):
         with tarfile.open(target_tar_file, "w", format=tarfile.PAX_FORMAT) as tar:
@@ -511,7 +556,11 @@ class Image(object):
             layer_id = layer.replace("sha256:", "")
 
             self.log.debug("Moving unmodified layer '%s'..." % layer_id)
-            shutil.move(os.path.join(src, layer_id), dest)
+            # Keep the layer's relative path (for example blobs/sha256/<id>
+            # in the OCI archive layout), because manifest.json refers to it.
+            target = os.path.join(dest, layer_id)
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            shutil.move(os.path.join(src, layer_id), target)
 
     def _file_should_be_skipped(self, file_name, file_paths):
         # file_paths is now array of array with files to be skipped.

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """run_formatter.py - A tool to run the various formatters with the project settings"""
+
 import argparse
 import sys
 from pathlib import Path

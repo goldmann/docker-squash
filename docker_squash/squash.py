@@ -140,8 +140,16 @@ class Squash(object):
             image.export_tar_archive(self.output_path)
 
         if self.load_image:
-            # Load squashed image into Docker
-            image.load_squashed_image()
+            # Load squashed image into Docker; use the ID assigned by the
+            # daemon, which differs from the computed one on some image stores
+            loaded_image_id = image.load_squashed_image()
+
+            if loaded_image_id:
+                if loaded_image_id != new_image_id:
+                    self.log.info(
+                        "Image ID assigned by the Docker daemon is %s" % loaded_image_id
+                    )
+                new_image_id = loaded_image_id
 
         # If development mode is not enabled, make sure we clean up the
         # temporary directory

@@ -1,9 +1,14 @@
+import sys
 from pathlib import Path
 from subprocess import PIPE, run
 
 import pytest
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 10),
+    reason="Black 25.12.0 and higher requires Python 3.10 or higher",
+)
 def test_formatting(monkeypatch):
     """Code formatting"""
 

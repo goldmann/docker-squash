@@ -1,10 +1,13 @@
 import codecs
+import gzip
+import hashlib
 import json
 import logging
 import os
 import re
 import shutil
 import tarfile
+import tempfile
 import unittest
 import uuid
 from io import BytesIO
@@ -745,6 +748,34 @@ class TestIntegSquash(IntegSquash):
         with self.Image(dockerfile) as image:
             with self.SquashedImage(image) as squashed_image:
                 self.assertEqual(len(squashed_image.layers), 1)
+
+    # https://github.com/goldmann/docker-squash/issues/260
+    def test_squashed_layer_is_gzipped_and_keeps_uncompressed_diff_id(self):
+        dockerfile = """
+        FROM %s
+        RUN touch /tmp/test1
+        RUN touch /tmp/test2
+        """ % TestIntegSquash.BUSYBOX_IMAGE
+
+        out_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, out_dir, True)
+        out_tar = os.path.join(out_dir, "squashed.tar")
+
+        with self.Image(dockerfile) as image:
+            with self.SquashedImage(image, output_path=out_tar):
+                with tarfile.open(out_tar, mode="r") as tar:
+                    manifest = json.load(tar.extractfile("manifest.json"))[0]
+                    config = json.load(tar.extractfile(manifest["Config"]))
+                    layer = tar.extractfile(manifest["Layers"][-1]).read()
+
+        self.assertEqual(layer[:2], b"\x1f\x8b")
+        uncompressed = gzip.decompress(layer)
+        self.assertEqual(
+            config["rootfs"]["diff_ids"][-1],
+            "sha256:%s" % hashlib.sha256(uncompressed).hexdigest(),
+        )
+        with tarfile.open(fileobj=BytesIO(uncompressed)) as layer_tar:
+            self.assertIn("tmp/test1", layer_tar.getnames())
 
     # https://github.com/goldmann/docker-scripts/issues/44
     def test_remove_tmp_dir_after_failure(self):

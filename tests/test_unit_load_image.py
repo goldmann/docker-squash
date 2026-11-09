@@ -1,3 +1,4 @@
+import gzip
 import os
 import shutil
 import tempfile
@@ -82,3 +83,39 @@ class TestMoveLayers(unittest.TestCase):
         self.image._move_layers(["abc"], self.src, self.dest)
 
         self.assertTrue(os.path.isfile(os.path.join(self.dest, "abc", "layer.tar")))
+
+
+class TestCompressSquashedLayer(unittest.TestCase):
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.root, True)
+        self.image = V2Image(mock.Mock(), mock.Mock(), "whatever", None)
+        self.image.squashed_tar = os.path.join(self.root, "layer.tar")
+        self.content = b"a" * 100000
+
+        with open(self.image.squashed_tar, "wb") as f:
+            f.write(self.content)
+
+    def test_replaces_layer_with_its_gzip(self):
+        self.image._compress_squashed_layer()
+
+        with open(self.image.squashed_tar, "rb") as f:
+            data = f.read()
+
+        self.assertEqual(data[:2], b"\x1f\x8b")
+        self.assertEqual(gzip.decompress(data), self.content)
+        self.assertLess(len(data), len(self.content))
+        self.assertEqual(os.listdir(self.root), ["layer.tar"])
+
+    def test_output_is_reproducible(self):
+        self.image._compress_squashed_layer()
+        with open(self.image.squashed_tar, "rb") as f:
+            first = f.read()
+
+        with open(self.image.squashed_tar, "wb") as f:
+            f.write(self.content)
+        self.image._compress_squashed_layer()
+        with open(self.image.squashed_tar, "rb") as f:
+            second = f.read()
+
+        self.assertEqual(first, second)

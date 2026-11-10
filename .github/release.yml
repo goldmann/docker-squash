@@ -1,0 +1,12 @@
+# From https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes#creating-automatically-generated-release-notes-for-a-new-release
+changelog:
+  categories:
+    - title: 🐛 Fixes / 🚀 Enhancements
+      labels:
+        - '*'
+      exclude:
+        labels:
+          - dependencies
+    - title: 👒 CI Dependencies
+      labels:
+        - github_actions

@@ -10,7 +10,7 @@ import shutil
 import tarfile
 import tempfile
 import threading
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Set, Union
 
 import docker as docker_library
 
@@ -290,17 +290,17 @@ class Image(object):
 
         return image_id
 
-    def _files_in_layers(self, layers):
+    def _files_in_layers(self, layers: List[str]) -> Dict[str, Set[str]]:
         """
-        Prepare a list of files in all layers
+        Prepare a set of files for each of the layers
         """
-        files = {}
+        files: Dict[str, Set[str]] = {}
 
         for layer in layers:
             self.log.debug("Generating list of files in layer '%s'..." % layer)
             tar_file = self._extract_tar_name(layer)
             with tarfile.open(tar_file, "r", format=tarfile.PAX_FORMAT) as tar:
-                files[layer] = [self._normalize_path(x) for x in tar.getnames()]
+                files[layer] = {self._normalize_path(x) for x in tar.getnames()}
             self.log.debug("Done, found %s files" % len(files[layer]))
 
         return files
@@ -614,7 +614,7 @@ class Image(object):
         # Some tar archives do have the filenames prefixed with './'
         # which does not have any effect when we unpack the tar achive,
         # but when processing tar content - we see this.
-        tar_files = [self._normalize_path(x) for x in tar.getnames()]
+        tar_files = {self._normalize_path(x) for x in tar.getnames()}
 
         for marker, marker_file in markers.items():
             actual_file = marker.name.replace(".wh.", "")
@@ -655,7 +655,7 @@ class Image(object):
                 tar.addfile(tarfile.TarInfo(name=marker.name), marker_file)
                 # Add the file name to the list too to avoid re-reading all files
                 # in tar archive
-                tar_files.append(normalized_file)
+                tar_files.add(normalized_file)
             else:
                 self.log.debug("Skipping '%s' marker file..." % marker.name)
 
@@ -705,7 +705,7 @@ class Image(object):
                             % (normalized_name, normalized_linkname)
                         )
 
-                    squashed_files.append(normalized_name)
+                    squashed_files.add(normalized_name)
                     squashed_tar.addfile(member)
 
     def _add_file(self, member, content, squashed_tar, squashed_files, to_skip):
@@ -732,7 +732,7 @@ class Image(object):
             squashed_tar.addfile(member)
 
         # We added a file to the squashed tar, so let's note it
-        squashed_files.append(normalized_name)
+        squashed_files.add(normalized_name)
 
     def _add_symlinks(self, squashed_tar, squashed_files, to_skip, skipped_sym_links):
         added_symlinks = []
@@ -790,7 +790,7 @@ class Image(object):
 
                     added_symlinks.append([normalized_name])
 
-                    squashed_files.append(normalized_name)
+                    squashed_files.add(normalized_name)
                     squashed_tar.addfile(member)
 
         return added_symlinks
@@ -814,7 +814,7 @@ class Image(object):
             skipped_sym_links = []
             skipped_files = []
             # List of filenames in the squashed archive
-            squashed_files = []
+            squashed_files: Set[str] = set()
             # List of opaque directories in the image
             opaque_dirs = []
             reading_layers: List[tarfile.TarFile] = []

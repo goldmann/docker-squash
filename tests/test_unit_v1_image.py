@@ -1,6 +1,9 @@
 import builtins
+import os
 import pathlib
+import shutil
 import tarfile
+import tempfile
 import unittest
 
 import mock
@@ -227,6 +230,38 @@ class TestMarkerFiles(unittest.TestCase):
 
         self.assertTrue(len(markers) == 0)
         self.assertTrue(markers == {})
+
+
+class TestFilesInLayers(unittest.TestCase):
+    def setUp(self):
+        self.docker_client = mock.Mock()
+        self.log = mock.Mock()
+        self.squash = Image(self.log, self.docker_client, "whatever", None)
+        self.squash.oci_format = True
+        self.tmp = tempfile.mkdtemp()
+        self.squash.old_image_dir = self.tmp
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _make_layer(self, name, members):
+        with tarfile.open(os.path.join(self.tmp, name), "w") as tar:
+            for member in members:
+                tar.addfile(tarfile.TarInfo(name=member))
+
+    def test_should_return_a_set_of_normalized_files_per_layer(self):
+        # Some tar archives prefix the names with './'
+        self._make_layer("layer1", ["./abc", "def", "dir/file"])
+        self._make_layer("layer2", ["./xyz"])
+
+        files = self.squash._files_in_layers(["layer1", "layer2"])
+
+        self.assertEqual(files["layer1"], {"/abc", "/def", "/dir/file"})
+        self.assertEqual(files["layer2"], {"/xyz"})
+        self.assertIsInstance(files["layer1"], set)
+
+    def test_should_return_empty_dict_for_no_layers(self):
+        self.assertEqual(self.squash._files_in_layers([]), {})
 
 
 class TestAddMarkers(unittest.TestCase):

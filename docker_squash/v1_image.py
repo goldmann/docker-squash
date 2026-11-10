@@ -27,7 +27,7 @@ class V1Image(Image):
         if self.layers_to_move:
             self.squash_id = self.layers_to_move[-1]
 
-    def _squash(self):
+    def _squash(self) -> str:
         # Prepare the directory
         os.makedirs(self.squashed_dir)
         self._squash_layers(self.layers_to_squash, self.layers_to_move)

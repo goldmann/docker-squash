@@ -41,7 +41,7 @@ From PyPi
 
     $ pip install docker-squash
 
-It is supported on Python 3.6 and above.
+It is supported on Python 3.7 and above.
 
 Usage
 -----

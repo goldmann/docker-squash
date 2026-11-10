@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import os
+from typing import Any, Dict
 
 import docker
+import docker.errors
+import docker.utils
 import requests
 
 from docker_squash.errors import Error
@@ -43,7 +46,7 @@ def docker_client(log):
     except KeyError:
         pass
 
-    params = {"version": "auto"}
+    params: Dict[str, Any] = {"version": "auto"}
     params.update(docker.utils.kwargs_from_env())
     params["timeout"] = timeout
 

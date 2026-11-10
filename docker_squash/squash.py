@@ -5,6 +5,7 @@ from logging import Logger
 from typing import Optional
 
 import docker.errors as docker_errors
+from docker.api.client import APIClient
 from packaging import version as packaging_version
 
 from docker_squash.errors import SquashError
@@ -20,7 +21,7 @@ class Squash(object):
         self,
         log,
         image,
-        docker=None,
+        docker: Optional[APIClient] = None,
         from_layer: Optional[str] = None,
         tag: Optional[str] = None,
         comment: Optional[str] = "",
@@ -30,15 +31,15 @@ class Squash(object):
         cleanup: Optional[bool] = False,
     ):
         self.log: Logger = log
-        self.docker = docker
+        self.docker: APIClient = docker if docker else common.docker_client(self.log)
         self.image: str = image
-        self.from_layer: str = from_layer
-        self.tag: str = tag
-        self.comment: str = comment
-        self.tmp_dir: str = tmp_dir
-        self.output_path: str = output_path
-        self.load_image: bool = load_image
-        self.cleanup: bool = cleanup
+        self.from_layer: Optional[str] = from_layer
+        self.tag: Optional[str] = tag
+        self.comment: Optional[str] = comment
+        self.tmp_dir: Optional[str] = tmp_dir
+        self.output_path: Optional[str] = output_path
+        self.load_image: Optional[bool] = load_image
+        self.cleanup: Optional[bool] = cleanup
         self.development = False
 
         if tag == image and cleanup:
@@ -46,8 +47,6 @@ class Squash(object):
             self.cleanup = False
         if tmp_dir:
             self.development = True
-        if not docker:
-            self.docker = common.docker_client(self.log)
 
     def run(self):
         docker_version = self.docker.version()
@@ -71,10 +70,12 @@ class Squash(object):
                 % self.output_path
             )
 
+        image: Image
+
         if packaging_version.parse(
             docker_version["ApiVersion"]
         ) >= packaging_version.parse("1.22"):
-            image: Image = V2Image(
+            image = V2Image(
                 self.log,
                 self.docker,
                 self.image,
@@ -84,7 +85,7 @@ class Squash(object):
                 self.comment,
             )
         else:
-            image: Image = V1Image(
+            image = V1Image(
                 self.log,
                 self.docker,
                 self.image,

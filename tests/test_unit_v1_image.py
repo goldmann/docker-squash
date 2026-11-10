@@ -1,4 +1,5 @@
 import builtins
+import io
 import os
 import pathlib
 import shutil
@@ -470,3 +471,74 @@ class TestPathHierarchy(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSquashLayersReplacedDirectory(unittest.TestCase):
+    """
+    https://github.com/goldmann/docker-squash/issues/253
+    """
+
+    def setUp(self):
+        self.tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp_dir, True)
+        self.squash = Image(mock.Mock(), mock.Mock(), "whatever", None)
+        self.squash.old_image_dir = os.path.join(self.tmp_dir, "old")
+        self.squash.squashed_tar = os.path.join(self.tmp_dir, "squashed.tar")
+
+    def _write_layer(self, layer_id, entries):
+        layer_dir = os.path.join(self.squash.old_image_dir, layer_id)
+        os.makedirs(layer_dir)
+        with tarfile.open(os.path.join(layer_dir, "layer.tar"), "w") as tar:
+            for name, kind in entries:
+                info = tarfile.TarInfo(name)
+                if kind == "dir":
+                    info.type = tarfile.DIRTYPE
+                    info.mode = 0o755
+                    tar.addfile(info)
+                else:
+                    info.mode = 0o644
+                    tar.addfile(info, io.BytesIO(b""))
+
+    def _squash_layers(self, layers, layers_to_move=()):
+        self.squash._squash_layers(list(layers), list(layers_to_move))
+        with tarfile.open(self.squash.squashed_tar) as tar:
+            return {m.name: m for m in tar.getmembers()}
+
+    def test_should_drop_files_below_a_directory_replaced_by_a_file(self):
+        self._write_layer(
+            "1", [("tmp", "dir"), ("tmp/dir", "dir"), ("tmp/dir/f", "file")]
+        )
+        self._write_layer("2", [("tmp", "dir"), ("tmp/dir", "file")])
+
+        members = self._squash_layers(["1", "2"])
+
+        self.assertTrue(members["tmp/dir"].isfile())
+        self.assertNotIn("tmp/dir/f", members)
+
+    def test_should_drop_markers_below_a_directory_replaced_by_a_file(self):
+        self._write_layer(
+            "1", [("tmp", "dir"), ("tmp/dir", "dir"), ("tmp/dir/f", "file")]
+        )
+        self._write_layer(
+            "2", [("tmp", "dir"), ("tmp/dir", "dir"), ("tmp/dir/.wh.f", "file")]
+        )
+        self._write_layer("3", [("tmp", "dir"), ("tmp/dir", "file")])
+
+        members = self._squash_layers(["2", "3"], ["1"])
+
+        self.assertTrue(members["tmp/dir"].isfile())
+        self.assertNotIn("tmp/dir/.wh.f", members)
+
+    def test_should_keep_files_below_a_directory_that_is_still_a_directory(self):
+        self._write_layer(
+            "1", [("tmp", "dir"), ("tmp/dir", "dir"), ("tmp/dir/f", "file")]
+        )
+        self._write_layer(
+            "2", [("tmp", "dir"), ("tmp/dir", "dir"), ("tmp/dir/g", "file")]
+        )
+
+        members = self._squash_layers(["1", "2"])
+
+        self.assertTrue(members["tmp/dir"].isdir())
+        self.assertIn("tmp/dir/f", members)
+        self.assertIn("tmp/dir/g", members)

@@ -815,6 +815,11 @@ class Image(object):
             skipped_files = []
             # List of filenames in the squashed archive
             squashed_files: Set[str] = set()
+            # Paths added to the squashed archive that are not directories.
+            # Anything below such a path in an older layer is stale, because
+            # the path was replaced by a non-directory in a newer layer.
+            # https://github.com/goldmann/docker-squash/issues/253
+            non_directories: Set[str] = set()
             # List of opaque directories in the image
             opaque_dirs = []
             reading_layers: List[tarfile.TarFile] = []
@@ -925,6 +930,16 @@ class Image(object):
                         )
                         continue
 
+                    if non_directories and any(
+                        parent in non_directories
+                        for parent in self._path_hierarchy(normalized_name)
+                    ):
+                        self.log.debug(
+                            "Skipping '%s' file because its parent was replaced by a non-directory"
+                            % normalized_name
+                        )
+                        continue
+
                     # Hard links are processed after everything else
                     if member.islnk():
                         skipped_hard_link_files[normalized_name] = member
@@ -938,6 +953,8 @@ class Image(object):
                     self._add_file(
                         member, content, squashed_tar, squashed_files, to_skip
                     )
+                    if not member.isdir() and normalized_name in squashed_files:
+                        non_directories.add(normalized_name)
 
                 skipped_hard_links.append(skipped_hard_link_files)
                 skipped_files.append(skipped_files_in_layer)
@@ -955,6 +972,13 @@ class Image(object):
                     self._add_file(
                         member, content, squashed_tar, squashed_files, added_symlinks
                     )
+
+            # Drop markers located below a path replaced by a non-directory
+            if non_directories:
+                for marker in list(skipped_markers):
+                    marked = self._normalize_path(marker.name.replace(".wh.", ""))
+                    if any(p in non_directories for p in self._path_hierarchy(marked)):
+                        skipped_markers.pop(marker)
 
             if files_in_layers_to_move:
                 self._reduce(skipped_markers)

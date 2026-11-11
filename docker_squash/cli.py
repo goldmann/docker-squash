@@ -6,7 +6,7 @@ import sys
 
 from docker_squash import squash
 from docker_squash.errors import SquashError
-from docker_squash.version import version
+from docker_squash.version import __version__
 
 
 # Source: http://stackoverflow.com/questions/1383254/logging-streamhandler-and-standard-streams
@@ -67,7 +67,10 @@ class CLI(object):
         )
 
         parser.add_argument(
-            "--version", action="version", help="Show version and exit", version=version
+            "--version",
+            action="version",
+            help="Show version and exit",
+            version=__version__,
         )
 
         parser.add_argument("image", help="Image to be squashed")
@@ -117,7 +120,7 @@ class CLI(object):
         else:
             self.log.setLevel(logging.INFO)
 
-        self.log.debug("Running version %s", version)
+        self.log.debug("Running version %s", __version__)
         try:
             squash.Squash(
                 log=self.log,

@@ -52,6 +52,4 @@ hook-gitter:
 	@curl -s -X POST -H "Content-Type: application/json" -d "{\"payload\":`curl -s -H "Accept: application/json" https://circleci.com/api/v1/project/goldmann/docker-squash/${CIRCLE_BUILD_NUM}`}" ${GITTER_WEBHOOK_URL}
 
 release: clean
-	python setup.py sdist
-	twine check dist/*
-	twine upload dist/*
+	python support/release.py

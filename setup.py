@@ -4,18 +4,18 @@ import codecs
 
 from setuptools import find_packages, setup
 
-from docker_squash.version import version
+from docker_squash.version import __version__
 
 with open("requirements.txt") as f:
     requirements = f.read().splitlines()
 
 setup(
     name="docker-squash",
-    version=version,
+    version=__version__,
     packages=find_packages(exclude=["tests"]),
     url="https://github.com/goldmann/docker-squash",
     download_url="https://github.com/goldmann/docker-squash/archive/%s.tar.gz"
-    % version,
+    % __version__,
     author="Marek Goldmann",
     author_email="marek.goldmann@gmail.com",
     description="Docker layer squashing tool",

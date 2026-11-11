@@ -13,7 +13,7 @@ from docker_squash.image import Image
 from docker_squash.lib import common
 from docker_squash.v1_image import V1Image
 from docker_squash.v2_image import V2Image
-from docker_squash.version import version
+from docker_squash.version import __version__
 
 
 class Squash(object):
@@ -52,7 +52,7 @@ class Squash(object):
         docker_version = self.docker.version()
         self.log.info(
             "docker-squash version %s, Docker %s, API %s..."
-            % (version, docker_version["Version"], docker_version["ApiVersion"])
+            % (__version__, docker_version["Version"], docker_version["ApiVersion"])
         )
 
         if self.image is None:

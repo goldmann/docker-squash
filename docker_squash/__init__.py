@@ -1,3 +1,1 @@
-from docker_squash.version import version
-
-__version__ = version
+from docker_squash.version import __version__  # noqa: F401
